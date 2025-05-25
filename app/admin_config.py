@@ -137,5 +137,11 @@ def admin_config():
 @admin_config_bp.route("/admin/", methods=["GET"])
 @login_required
 def admin_dashboard():
-    # You can customize this dashboard as needed
-    return render_template("admin_dashboard.html")
+    # Provide summary info and links, matching admin_dashboard.py
+    info = {
+        "TELEGRAM_BOT_TOKEN": os.getenv("TELEGRAM_BOT_TOKEN", "")[:8] + "..." if os.getenv("TELEGRAM_BOT_TOKEN") else "",
+        "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY", "")[:8] + "..." if os.getenv("ANTHROPIC_API_KEY") else "",
+        "CHRISTIANVISION_CHANNEL": os.getenv("CHRISTIANVISION_CHANNEL", ""),
+        "SHALTNOTKILL_CHANNEL": os.getenv("SHALTNOTKILL_CHANNEL", ""),
+    }
+    return render_template("admin_dashboard.html", info=info)

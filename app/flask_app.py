@@ -6,7 +6,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
 from admin_config import admin_config_bp  # add this import
-from admin_channel_translate import admin_channel_translate_bp  # add this import
+from admin_manager import admin_manager_bp  # renamed import
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -75,7 +75,7 @@ def logout():
 app.register_blueprint(admin_bp)
 app.register_blueprint(admin_prompt_bp)
 app.register_blueprint(admin_config_bp)  # add this
-app.register_blueprint(admin_channel_translate_bp)  # add this
+app.register_blueprint(admin_manager_bp)  # renamed blueprint
 
 TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 
