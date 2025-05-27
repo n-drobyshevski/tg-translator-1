@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, redirect, url_for, flash, ren
 import os
 from pathlib import Path
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from datetime import datetime
 
 from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
@@ -49,21 +50,8 @@ def login():
             )
         else:
             flash("Wrong password, try again!", "error")
-    return render_template_string(
-        """
-      <!doctype html><title>Admin Login</title>
-      {% with msgs = get_flashed_messages(with_categories=true) %}
-        {% for cat, m in msgs %}<p class="{{cat}}">{{m}}</p>{% endfor %}
-      {% endwith %}
-      <form method="post">
-        <label>Password :</label>
-        <input name="password" type="password" autofocus required>
-        <button type="submit">Enter</button>
-      </form>
-    """
-    )
-
-
+    return render_template("login.html")
+   
 # --- Logout Route ---
 @app.route("/logout")
 @login_required
@@ -84,6 +72,16 @@ TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 def home_page():
     return render_template("home.html")
 
+def datetimeformat(value, format='%M-%H %d-%m-%Y'):
+    try:
+        if isinstance(value, datetime):
+            return value.strftime(format)
+        ts = float(value)
+        return datetime.fromtimestamp(ts).strftime(format)
+    except Exception:
+        return value
+
+app.jinja_env.filters['datetimeformat'] = datetimeformat
 
 if __name__ == "__main__":
     # Ensure the template file exists

@@ -3,66 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <title>Channel Cache Viewer</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
+    <style>
+      body {
+        font-family: 'Roboto', sans-serif;
+      }
+    </style>
 </head>
-<body class="bg-light">
-    <div class="container mt-4">
-        <a class="btn btn-outline-secondary mb-3" href="/admin">← Admin Dashboard</a>
-        <h2>Channel Cache Viewer</h2>
-        <form class="mb-4" method="get">
-            <div class="row g-2 align-items-center">
-                <div class="col-auto">
-                    <label for="channel_filter" class="col-form-label">Filter by Channel:</label>
-                </div>
-                <div class="col-auto">
-                    <select id="channel_filter" name="channel" class="form-select" onchange="this.form.submit()">
-                        <option value="">All Channels</option>
-                        {% for cid, cname in channel_id_to_name.items() %}
-                            <option value="{{ cid }}" {% if request.args.get('channel') == cid %}selected{% endif %}>{{ cname }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto mt-8">
+        <div class="flex items-center mb-6">
+            <a class="btn-back flex items-start px-2 py-2 text-gray-700 hover:bg-gray-200 transition" href="/admin" style="border: none; background: transparent;">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7l-4 4 4 4" />
+                </svg>
+            </a>
+            <h1 class="text-3xl font-bold mt-[-5px]" >Channel Cache</h1>
+        </div>
+        <hr class="mb-6">
+        <form class="mb-6" method="get">
+            <div class="flex items-center gap-2">
+                <label for="channel_filter" class="font-medium">Filter by Channel:</label>
+                <select id="channel_filter" name="channel" class="border rounded px-3 py-2" onchange="this.form.submit()">
+                    <option value="">All Channels</option>
+                    {% for cid, cname in channel_id_to_name.items() %}
+                        <option value="{{ cid }}" {% if request.args.get('channel') == cid %}selected{% endif %}>{{ cname }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </form>
         {% if error %}
-            <div class="alert alert-danger">{{ error }}</div>
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{{ error }}</div>
         {% endif %}
         {% if cache_data %}
             {% set selected_channel = request.args.get('channel') %}
             {% for channel_id, messages in cache_data.items() %}
                 {% if not selected_channel or selected_channel == channel_id %}
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <b>Channel:</b>
-                        {{ channel_id_to_name.get(channel_id, "Unknown") }}
-                        <span class="text-muted">(ID: {{ channel_id }}, {{ messages|length }} messages)</span>
+                <div class="bg-white rounded shadow mb-8">
+                    <div class="px-4 py-2 border-b flex flex-wrap items-center justify-between">
+                        <div class="flex flex-wrap items-center gap-4">
+                            <span class="text-xl font-semibold text-gray-800">
+                                {{ channel_id_to_name.get(channel_id, "Unknown") }}
+                            </span>
+                            <span class="text-sm text-gray-500">
+                                <b>ID:</b> {{ channel_id }}
+                            </span>
+                            {% if messages and messages|length > 0 %}
+                                <span class="text-sm text-gray-500">
+                                    <b>Message ID:</b> {{ messages[0].message_id }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% if messages and messages|length > 0 %}
+                            <span class="text-gray-500 ml-auto min-w-[120px] text-right">
+                                {{ messages[0].date_formatted }}
+                            </span>
+                        {% endif %}
                     </div>
-                    <ul class="list-group list-group-flush">
+                    <ul>
                         {% for msg in messages %}
-                            <li class="list-group-item">
-                                <div><b>Message ID:</b> {{ msg.message_id }}</div>
-                                <div>
-                                    <b>Date:</b>
-                                    {% if msg.date_readable %}
-                                        {{ msg.date_readable }}
+                        <li class="border-b last:border-b-0" id="source-{{ channel_id }}-{{ msg.message_id }}">
+                            <div class="px-4 py-3 card-content">
+                                <!-- date is now only in header -->
+                                {% if msg.source_channel_id %}
+                                <div class="mb-2 text-sm text-gray-500">
+                                    {% set source_card = cache_data[msg.source_channel_id|string] if cache_data[msg.source_channel_id|string] is defined else None %}
+                                    {% if source_card %}
+                                        <button type="button"
+                                            class="text-blue-600 hover:underline bg-transparent px-0 py-0 border-none transition-colors duration-200 go-to-source-link"
+                                            data-target="source-{{ msg.source_channel_id }}-{{ msg.source_message_id }}">
+                                            Translated from : {{ msg.source_channel_id }} | {{ msg.source_message_id }}
+                                        </button>
                                     {% else %}
-                                        {{ msg.date }}
+                                        translated from : Channel "{{ msg.source_channel_id }} ; message {{ msg.source_message_id }}
                                     {% endif %}
                                 </div>
-                                <div><b>Rendered HTML:</b>
-                                    <div class="border rounded p-2 bg-white" style="white-space: pre-wrap;">
-                                        {{ msg.html | safe }}
+                                {% endif %}
+                                <div class="mt-2">
+                                    <div class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 mt-1 overflow-hidden transition-all duration-300 message-preview" style="max-height:8.5em;">
+                                        <div class="message-content" style="white-space: pre-line;">
+                                            {{ msg.html | safe }}
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-center mt-2">
+                                        <button type="button"
+                                            class="px-2 py-1 text-blue-600 hover:underline focus:outline-none"
+                                            onclick="toggleCard(this)">
+                                            <span class="show-more-label">Show more</span>
+                                        </button>
                                     </div>
                                 </div>
-                            </li>
+                            </div>
+                        </li>
                         {% endfor %}
                     </ul>
                 </div>
                 {% endif %}
             {% endfor %}
         {% else %}
-            <div class="alert alert-info">No cache data found.</div>
+            <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">No cache data found.</div>
         {% endif %}
     </div>
 </body>
 </html>
+<script>
+function toggleCard(btn) {
+    const preview = btn.closest('.px-4.py-3').querySelector('.message-preview');
+    const label = btn.querySelector('.show-more-label');
+    if (preview.classList.contains('expanded')) {
+        preview.classList.remove('expanded');
+        preview.style.maxHeight = '8.5em';
+        label.textContent = 'Show more';
+    } else {
+        preview.classList.add('expanded');
+        preview.style.maxHeight = '1000px';
+        label.textContent = 'Show less';
+    }
+}
+
+// Highlight card when navigated via anchor or Go to source
+function highlightCardById(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        const card = el.querySelector('.card-content');
+        if (card) {
+            card.classList.add('ring-4', 'ring-blue-400', 'transition');
+            setTimeout(() => {
+                card.classList.remove('ring-4', 'ring-blue-400');
+            }, 1500);
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+}
+
+function highlightCardFromHash() {
+    if (window.location.hash.startsWith("#source-")) {
+        highlightCardById(window.location.hash.substring(1));
+    }
+}
+window.addEventListener('DOMContentLoaded', highlightCardFromHash);
+window.addEventListener('hashchange', highlightCardFromHash);
+
+// Make Go to source links reusable
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.go-to-source-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = link.getAttribute('data-target');
+            highlightCardById(targetId);
+            // Optionally update the hash in the URL
+            history.replaceState(null, '', '#' + targetId);
+        });
+    });
+});
+</script>
+<style>
+.message-preview {
+    /* Show only first 7 lines by default */
+    display: -webkit-box;
+    -webkit-line-clamp: 7;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-height: 11.9em;
+    transition: max-height 0.3s;
+}
+.message-preview.expanded {
+    -webkit-line-clamp: unset;
+    max-height: 1000px;
+    overflow: visible;
+}
+</style>

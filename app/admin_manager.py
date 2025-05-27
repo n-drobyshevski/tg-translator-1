@@ -264,6 +264,24 @@ def channel_translate():
         selected_channel_is_en=selected_channel_is_en,
     )
 
+from datetime import datetime
+
+def datetimeformat(value, format='%H:%M %d/%m/%Y'):
+    try:
+        # Handle ISO 8601 string (e.g., 2025-05-25T12:46:24)
+        if isinstance(value, str) and "T" in value:
+            dt = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+            return dt.strftime(format)
+        # Handle datetime object
+        if isinstance(value, datetime):
+            return value.strftime(format)
+        # Handle timestamp (int/float/str)
+        ts = float(value)
+        return datetime.fromtimestamp(ts).strftime(format)
+    except Exception:
+        print(f"[ERROR] Failed to format datetime value: {value}")
+        return value
+
 @admin_manager_bp.route("/admin/cache", methods=["GET"])
 @login_required
 def show_cache():
@@ -279,17 +297,13 @@ def show_cache():
             with open(cache_path, "r", encoding="utf-8") as f:
                 cache_data = json.load(f)
             # Convert timestamps to readable format if possible
-            from datetime import datetime
             for messages in cache_data.values():
                 for msg in messages:
                     ts = msg.get("date")
-                    if ts and isinstance(ts, (int, float, str)):
-                        try:
-                            # Try to parse as int timestamp (seconds since epoch)
-                            ts_int = int(float(ts))
-                            msg["date_readable"] = datetime.utcfromtimestamp(ts_int).strftime('%Y-%m-%d %H:%M:%S UTC')
-                        except Exception:
-                            msg["date_readable"] = str(ts)
+                    if ts:
+                        msg["date_formatted"] = datetimeformat(ts)
+                    else:
+                        msg["date_formatted"] = ""
         except Exception as e:
             error = f"Failed to read cache: {e}"
     else:
@@ -300,7 +314,6 @@ def show_cache():
     for ch in get_available_channels():
         if ch["id"]:
             channel_id_to_name[str(ch["id"])] = ch["name"]
-    # Ensure test destination channel is always present in mapping
     test_dest_id = os.getenv("TARGET_CHANNEL_ID")
     if test_dest_id and str(test_dest_id) not in channel_id_to_name:
         channel_id_to_name[str(test_dest_id)] = "Test Destination Channel"
