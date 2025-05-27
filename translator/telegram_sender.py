@@ -176,3 +176,29 @@ class TelegramSender:
             text_chars[s:e] = [segment]
 
         return "".join(text_chars)
+
+    def edit_message(self, channel_id, message_id, text):
+        """
+        Edit a message in a Telegram channel by channel_id and message_id.
+        Returns True if successful, False otherwise.
+        """
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
+        sanitized_text = text.replace("<p>", "").replace("</p>", "")
+        payload = {
+            "chat_id": channel_id,
+            "message_id": message_id,
+            "text": sanitized_text,
+            "parse_mode": "HTML"
+        }
+        try:
+            # Use the shared _SESSION for HTTP requests
+            resp = _SESSION.post(url, data=payload, timeout=10)
+            if resp.status_code == 200 and resp.json().get("ok"):
+                return True
+            else:
+                logging.error("Failed to edit message %s in %s: %s", message_id, channel_id, resp.text)
+                return False
+        except Exception as e:
+            logging.error("Exception editing message %s in %s: %s", message_id, channel_id, e)
+            return False

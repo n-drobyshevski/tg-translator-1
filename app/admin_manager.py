@@ -220,6 +220,11 @@ def channel_translate():
                 chat_username = msg.get("chat_username", "")
                 break
 
+        edited_source = request.form.get("edited_source") if request.method == "POST" else None
+        # Use edited source if present
+        if edited_source:
+            selected_message_text = edited_source
+
         # Only translate when user explicitly clicks "translate"
         if selected_message_text and not selected_channel_is_en and action == "translate":
             try:
@@ -258,6 +263,21 @@ def channel_translate():
                 raw_html_result = translation_result
                 rendered_html_result = translation_result
 
+        # after translation, repopulate recent_messages for re-render
+        last_msgs = get_last_messages(selected_channel_id)
+        recent_messages = []
+        for msg in reversed(last_msgs):
+            msg_id = msg.get("message_id")
+            html   = msg.get("html", "")
+            raw_ts = msg.get("date", "")
+            try:
+                dt = datetime.datetime.fromisoformat(raw_ts)
+                ts = dt.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                ts = raw_ts
+            recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
+        recent_messages = recent_messages[:10]
+
     # Step 3: Post to target channel if requested
     if action == "post":
         print("Posting translation result to target channel")
@@ -269,27 +289,52 @@ def channel_translate():
             else:
                 print(f"[ADMIN][POST] Posting to channel type '{selected_target_type}'")
                 message_to_send = raw_html_result or translation_result
-                ok = asyncio.run(
-                    sender.send_message(message_to_send, selected_target_type)
-                )
-                post_result = "Posted successfully." if ok else "Failed to post."
-
-                if ok:
-                    # find the human‐readable channel name
-                    target_obj = next((ch for ch in target_channels if ch["type"] == selected_target_type), {})
+                edit_mode = request.form.get("edit_mode")
+                print(f"[DEBUG] edit_mode: {edit_mode}")
+                if edit_mode:
+                    # Edit any available message in the target channel (prefer the most recent)
+                    last_msgs = get_last_messages(selected_target_channel_id)
+                    print(f"[DEBUG] last_msgs for channel {selected_target_channel_id}: {last_msgs}")
                     msg_id = None
-                    if hasattr(sender, "last_message_id"):
-                        msg_id = sender.last_message_id
-                    # store into our cache
-                    store_message(selected_target_channel_id, {
-                        "message_id": msg_id,
-                        "source_channel_id": selected_channel_id,
-                        "source_message_id": selected_message_id,
-                        "date": datetime.datetime.now(datetime.timezone.utc),
-                        "chat_title": target_obj.get("name", ""),
-                        "chat_username": "",
-                        "html": message_to_send
-                    })
+                    if last_msgs:
+                        # Try to find a message to edit (prefer the most recent with a valid message_id)
+                        for msg in reversed(last_msgs):
+                            print(f"[DEBUG] Checking msg: {msg}")
+                            if msg.get("message_id"):
+                                msg_id = msg.get("message_id")
+                                print(f"[DEBUG] Found message_id to edit: {msg_id}")
+                                break
+                    if msg_id:
+                        print(f"[DEBUG] Calling edit_message with channel_id={selected_target_channel_id}, message_id={msg_id}")
+                        ok = sender.edit_message(selected_target_channel_id, msg_id, message_to_send)
+                        print(f"[DEBUG] edit_message result: {ok}")
+                        post_result = "Edited last message." if ok else "Failed to edit message."
+                    else:
+                        print(f"[DEBUG] No message_id found to edit in channel {selected_target_channel_id}")
+                        post_result = "No message to edit in target channel."
+                else:
+                    print(f"[DEBUG] Calling send_message with target_type={selected_target_type}")
+                    ok = asyncio.run(
+                        sender.send_message(message_to_send, selected_target_type)
+                    )
+                    print(f"[DEBUG] send_message result: {ok}")
+                    post_result = "Posted successfully." if ok else "Failed to post."
+
+                    if ok:
+                        target_obj = next((ch for ch in target_channels if ch["type"] == selected_target_type), {})
+                        msg_id = None
+                        if hasattr(sender, "last_message_id"):
+                            msg_id = sender.last_message_id
+                        print(f"[DEBUG] Storing message in cache with id={msg_id}")
+                        store_message(selected_target_channel_id, {
+                            "message_id": msg_id,
+                            "source_channel_id": selected_channel_id,
+                            "source_message_id": selected_message_id,
+                            "date": datetime.datetime.now(datetime.timezone.utc),
+                            "chat_title": target_obj.get("name", ""),
+                            "chat_username": "",
+                            "html": message_to_send
+                        })
         except Exception as e:
             post_result = f"Error posting: {e}"
 

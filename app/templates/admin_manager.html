@@ -134,16 +134,36 @@
             <div class="flex flex-col h-full">
               <div class="flex items-center mb-2">
                 <h4 class="text-lg font-semibold flex-grow">Source Message</h4>
+                <a href="javascript:void(0)"
+                   id="editSourceBtn"
+                   class="ml-2 text-blue-600 hover:underline"
+                   onclick="toggleSourceEditMode()">
+                   Edit
+                </a>
               </div>
-              <div id="raw-html-source"
-                   class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                   style="white-space: pre-line; display: none;">
-                <pre class="m-0 p-0">{{ selected_message_text|trim }}</pre>
+              <!-- Source message edit mode -->
+              <div id="source-edit-area" class="mb-2 hidden flex flex-col flex-grow">
+                <textarea id="source-edit-textarea"
+                          class="w-full flex-grow border rounded p-2 text-sm resize-y"
+                          style="min-height:200px;"
+                          rows="12">{{ selected_message_text|trim }}</textarea>
+                <div class="flex gap-2 mt-2">
+                  <button type="button"
+                          class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
+                          onclick="saveSourceEdit()">
+                    Save & Translate
+                  </button>
+                  <button type="button"
+                          class="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
+                          onclick="cancelSourceEdit()">
+                    Cancel
+                  </button>
+                </div>
               </div>
               <div id="source-message-block"
                    class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded flex flex-col justify-start">
                 <div class="h-full flex flex-col justify-start" style="white-space: pre-line;">
-                  <span class="text-left">
+                  <span class="text-left" id="source-message-content">
                     {{ selected_message_text|trim|safe }}
                   </span>
                 </div>
@@ -172,8 +192,8 @@
                             tgtBlock.style.display = 'block';
                           }
                         ">
-                  Toggle Raw HTML
-                </button>
+                Toggle Raw HTML
+              </button>
               </div>
               <div id="raw-html-content"
                    class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
@@ -200,10 +220,11 @@
             <input type="hidden" name="message_id" value="{{ selected_message_id }}">
             <input type="hidden" name="action" id="translation-action" value="">
             <input type="hidden" name="target_channel_id" id="target_channel_id" value="">
-            <!-- carry over the translation so we don't re-run on post -->
             <input type="hidden" name="translation_result" value="{{ translation_result|e }}">
             <input type="hidden" name="raw_html_result" value="{{ raw_html_result|e }}">
+            <!-- New: option to replace existing message variant -->
             <label for="target_channel" class="font-medium block">Select target channel:</label>
+           
             <select name="target_channel"
                     id="target_channel"
                     class="border rounded px-3 py-2 w-full md:w-auto"
@@ -217,13 +238,23 @@
                 </option>
               {% endfor %}
             </select>
+            <div class="mt-2">
+              <label class="inline-flex items-center">
+                <input type="checkbox"
+                       name="edit_mode"
+                       id="edit_mode"
+                       class="form-checkbox"
+                       checked>
+                <span class="ml-2">Edit last message in target channel instead of posting new</span>
+              </label>
+            </div>
 
             <button type="button" id="postBtn"
                     class="mt-2 px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 transition">
               Post
             </button>
           </form>
-
+          
           {% if post_result %}
             <div id="postResultBox" class="mt-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
               {{ post_result }}
@@ -235,7 +266,8 @@
             </div>
           {% endif %}
         </div>
-      {% endif %}
+      {% endif %} 
+      
     </div>
     <div class="h-16"></div>
     <!--  Post Validation Dialog -->
@@ -313,6 +345,64 @@
              if(box) box.scrollIntoView({behavior: "smooth", block: "center"});
           }
       });
+
+      function toggleSourceEditMode() {
+        var editArea = document.getElementById('source-edit-area');
+        var block = document.getElementById('source-message-block');
+        if (editArea.style.display === 'none' || editArea.classList.contains('hidden')) {
+          editArea.classList.remove('hidden');
+          editArea.style.display = 'flex';
+          block.style.display = 'none';
+          // Expand textarea to available height
+          setTimeout(function() {
+            var ta = document.getElementById('source-edit-textarea');
+            if (ta) {
+              ta.style.height = (window.innerHeight * 0.4) + "px";
+            }
+          }, 100);
+        } else {
+          editArea.classList.add('hidden');
+          editArea.style.display = 'none';
+          block.style.display = 'block';
+        }
+      }
+
+      function saveSourceEdit() {
+        var textarea = document.getElementById('source-edit-textarea');
+        var content = textarea.value;
+        // Set the textarea value to a hidden input and submit a form to trigger translation
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = window.location.pathname;
+        // Add all needed hidden fields
+        [
+          ['source_channel', document.getElementById('source_channel').value],
+          ['message_id', document.getElementById('message_id').value],
+          ['action', 'translate'],
+          ['edited_source', content]
+        ].forEach(function(pair) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = pair[0];
+          input.value = pair[1];
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      function cancelSourceEdit() {
+        toggleSourceEditMode();
+      }
+
+      function redoTranslation() {
+        // Submit the translation form with action=translate
+        var form = document.getElementById('translationForm');
+        if (form) {
+          document.getElementById('translation-action').value = 'translate';
+          form.submit();
+        }
+      }
     </script>
   </body>
 </html>
