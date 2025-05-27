@@ -4,8 +4,9 @@ import requests
 import asyncio
 from pathlib import Path
 from flask_login import login_required  
-import json  
 import bleach
+from translator.channel_logger import get_last_messages, check_deleted_messages, store_message   # add store_message
+import datetime                                                                                 # add datetime
 
 from anthropic import Anthropic
 from translator.channel_logger import get_last_messages, check_deleted_messages
@@ -70,7 +71,8 @@ def get_target_channels():
         },
         {
             "name": "Test EN",
-            "id": os.getenv("CHRISTIANVISION_EN_CHANNEL_ID"),
+            # use TARGET_CHANNEL_ID for the test destination
+            "id": os.getenv("TARGET_CHANNEL_ID"),
             "type": "test",
         },
     ]
@@ -84,11 +86,24 @@ def channel_translate():
     selected_message_id = request.form.get("message_id") if request.method == "POST" else None
     selected_target_type = request.form.get("target_channel") if request.method == "POST" else None
     action = request.form.get("action") if request.method == "POST" else None
+
+    # pull the selected target channel _id_ from the form
+    selected_target_channel_id = request.form.get("target_channel_id") if request.method == "POST" else None
+
+    # initialize all result variables immediately
     translation_result = ""
-    post_result = ""
+    raw_html_result = ""
+    rendered_html_result = ""
+    post_result = ""          # <<< ensure this is defined unconditionally
+    delete_result = ""
     recent_messages = []
     selected_message_text = ""
-    delete_result = ""
+
+    # Avoid re-translating on post: restore previous translation
+    if request.method == "POST" and action == "post":
+        translation_result = request.form.get("translation_result", "")
+        raw_html_result = request.form.get("raw_html_result", "")
+        rendered_html_result = translation_result
 
     # Always determine if selected_channel_is_en before any return
     selected_channel_is_en = False
@@ -103,22 +118,23 @@ def channel_translate():
 
     # Step 1: Select channel and fetch recent messages
     if selected_channel_id and not selected_message_id:
-        # Optionally update cache before showing messages
-
-        # Use channel_logger to fetch recent messages from cache
         last_msgs = get_last_messages(selected_channel_id)
         recent_messages = []
         for msg in reversed(last_msgs):
             msg_id = msg.get("message_id")
-            html = msg.get("html", "")
-            ts = msg.get("date", "")
+            html   = msg.get("html", "")
+            raw_ts = msg.get("date", "")
+            # parse ISO-format, with or without offset
+            try:
+                dt = datetime.datetime.fromisoformat(raw_ts)
+                ts = dt.strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                ts = raw_ts
             recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
         # Only keep the last 10 (should already be limited by logger, but for safety)
         recent_messages = recent_messages[:10]
 
     # Step 2: Select message and translate
-    raw_html_result = ""
-    rendered_html_result = ""
     if selected_channel_id and selected_message_id:
         # Handle delete action
         if action == "delete":
@@ -165,8 +181,13 @@ def channel_translate():
             recent_messages = []
             for msg in reversed(last_msgs):
                 msg_id = msg.get("message_id")
-                html = msg.get("html", "")
-                ts = msg.get("date", "")
+                html   = msg.get("html", "")
+                raw_ts = msg.get("date", "")
+                try:
+                    dt = datetime.datetime.fromisoformat(raw_ts)
+                    ts = dt.strftime('%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    ts = raw_ts
                 recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
             recent_messages = recent_messages[:10]
             # Reset selected_message_id so dropdown is updated and nothing is selected
@@ -199,8 +220,8 @@ def channel_translate():
                 chat_username = msg.get("chat_username", "")
                 break
 
-        # Only translate if action is "translate" or "post", and not for EN channels
-        if selected_message_text and not selected_channel_is_en and (action == "translate" or action == "post"):
+        # Only translate when user explicitly clicks "translate"
+        if selected_message_text and not selected_channel_is_en and action == "translate":
             try:
                 print(f"[ADMIN] Translating message {selected_message_id} from channel {selected_channel_id}")
                 # --- Use build_prompt and translate_html from translator_reg ---
@@ -208,8 +229,8 @@ def channel_translate():
 
                 # Avoid HTML in payload, use plain text for source channel info
                 if chat_username:
-                    source_channel_link = f"https://t.me/{chat_username}"
-                    html_with_source = f"{selected_message_text}\n\nSource channel: {chat_title} ({source_channel_link})"
+                    source_channel_link = f'<a href="https://t.me/{chat_username}">{chat_title}</a>'
+                    html_with_source = f"{selected_message_text}\n\nSource channel: {source_channel_link}"
                 else:
                     html_with_source = f"{selected_message_text}\n\nSource channel: {chat_title}"
                 payload = {
@@ -238,12 +259,37 @@ def channel_translate():
                 rendered_html_result = translation_result
 
     # Step 3: Post to target channel if requested
-    if selected_channel_id and selected_message_id and selected_target_type and translation_result and action == "post":
+    if action == "post":
+        print("Posting translation result to target channel")
         try:
             from translator.telegram_sender import TelegramSender
             sender = TelegramSender()
-            ok = asyncio.run(sender.send_message(translation_result, selected_target_type))
-            post_result = "Posted successfully." if ok else "Failed to post."
+            if not selected_target_type:
+                post_result = "Error posting: Target channel not found."
+            else:
+                print(f"[ADMIN][POST] Posting to channel type '{selected_target_type}'")
+                message_to_send = raw_html_result or translation_result
+                ok = asyncio.run(
+                    sender.send_message(message_to_send, selected_target_type)
+                )
+                post_result = "Posted successfully." if ok else "Failed to post."
+
+                if ok:
+                    # find the human‐readable channel name
+                    target_obj = next((ch for ch in target_channels if ch["type"] == selected_target_type), {})
+                    msg_id = None
+                    if hasattr(sender, "last_message_id"):
+                        msg_id = sender.last_message_id
+                    # store into our cache
+                    store_message(selected_target_channel_id, {
+                        "message_id": msg_id,
+                        "source_channel_id": selected_channel_id,
+                        "source_message_id": selected_message_id,
+                        "date": datetime.datetime.now(datetime.timezone.utc),
+                        "chat_title": target_obj.get("name", ""),
+                        "chat_username": "",
+                        "html": message_to_send
+                    })
         except Exception as e:
             post_result = f"Error posting: {e}"
 
@@ -263,86 +309,3 @@ def channel_translate():
         delete_result=delete_result,
         selected_channel_is_en=selected_channel_is_en,
     )
-
-from datetime import datetime
-
-def datetimeformat(value, format='%H:%M %d/%m/%Y'):
-    try:
-        # Handle ISO 8601 string (e.g., 2025-05-25T12:46:24)
-        if isinstance(value, str) and "T" in value:
-            dt = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
-            return dt.strftime(format)
-        # Handle datetime object
-        if isinstance(value, datetime):
-            return value.strftime(format)
-        # Handle timestamp (int/float/str)
-        ts = float(value)
-        return datetime.fromtimestamp(ts).strftime(format)
-    except Exception:
-        print(f"[ERROR] Failed to format datetime value: {value}")
-        return value
-
-@admin_manager_bp.route("/admin/cache", methods=["GET"])
-@login_required
-def show_cache():
-    try:
-        from translator.channel_logger import CACHE_DIR
-    except ImportError:
-        CACHE_DIR = "cache"
-    cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
-    cache_data = {}
-    error = None
-    if os.path.exists(cache_path):
-        try:
-            with open(cache_path, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-            # Convert timestamps to readable format if possible
-            for messages in cache_data.values():
-                for msg in messages:
-                    ts = msg.get("date")
-                    if ts:
-                        msg["date_formatted"] = datetimeformat(ts)
-                    else:
-                        msg["date_formatted"] = ""
-        except Exception as e:
-            error = f"Failed to read cache: {e}"
-    else:
-        error = f"Cache file not found: {cache_path}"
-
-    # Build channel_id -> channel_name mapping, including test destination channel
-    channel_id_to_name = {}
-    for ch in get_available_channels():
-        if ch["id"]:
-            channel_id_to_name[str(ch["id"])] = ch["name"]
-    test_dest_id = os.getenv("TARGET_CHANNEL_ID")
-    if test_dest_id and str(test_dest_id) not in channel_id_to_name:
-        channel_id_to_name[str(test_dest_id)] = "Test Destination Channel"
-
-    return render_template(
-        "admin_cache_view.html",
-        cache_data=cache_data,
-        error=error,
-        channel_id_to_name=channel_id_to_name,
-    )
-
-@admin_manager_bp.route("/admin/cache/update", methods=["POST"])
-@login_required
-def update_cache():
-    """
-    Update the cache for a given channel and message using channel_logger.store_message.
-    Expects JSON payload: { "channel_id": ..., "message": {...} }
-    """
-    from translator.channel_logger import store_message
-
-    data = request.get_json(silent=True)
-    if not data or "channel_id" not in data or "message" not in data:
-        return jsonify({"error": "Missing channel_id or message"}), 400
-
-    channel_id = data["channel_id"]
-    message_data = data["message"]
-
-    try:
-        store_message(channel_id, message_data)
-        return jsonify({"status": "ok"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500

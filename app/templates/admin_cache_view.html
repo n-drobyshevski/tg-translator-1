@@ -11,7 +11,7 @@
       }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
     <div class="container mx-auto mt-8">
         <div class="flex items-center mb-6">
             <a class="btn-back flex items-start px-2 py-2 text-gray-700 hover:bg-gray-200 transition" href="/admin" style="border: none; background: transparent;">
@@ -46,26 +46,19 @@
                             <span class="text-xl font-semibold text-gray-800">
                                 {{ channel_id_to_name.get(channel_id, "Unknown") }}
                             </span>
-                            <span class="text-sm text-gray-500">
+                            <span class="text-sm text-gray-500 mt-[3px]">
                                 <b>ID:</b> {{ channel_id }}
                             </span>
-                            {% if messages and messages|length > 0 %}
-                                <span class="text-sm text-gray-500">
-                                    <b>Message ID:</b> {{ messages[0].message_id }}
-                                </span>
-                            {% endif %}
                         </div>
-                        {% if messages and messages|length > 0 %}
-                            <span class="text-gray-500 ml-auto min-w-[120px] text-right">
-                                {{ messages[0].date_formatted }}
-                            </span>
-                        {% endif %}
                     </div>
                     <ul>
                         {% for msg in messages %}
                         <li class="border-b last:border-b-0" id="source-{{ channel_id }}-{{ msg.message_id }}">
                             <div class="px-4 py-3 card-content">
-                                <!-- date is now only in header -->
+                                <div class="mb-2 text-sm text-gray-500">
+                                    <span><b>Message ID:</b> {{ msg.message_id }}</span>
+                                    <span class="ml-4"><b>Time:</b> {{ msg.date_formatted }}</span>
+                                </div>
                                 {% if msg.source_channel_id %}
                                 <div class="mb-2 text-sm text-gray-500">
                                     {% set source_card = cache_data[msg.source_channel_id|string] if cache_data[msg.source_channel_id|string] is defined else None %}
@@ -76,7 +69,7 @@
                                             Translated from : {{ msg.source_channel_id }} | {{ msg.source_message_id }}
                                         </button>
                                     {% else %}
-                                        translated from : Channel "{{ msg.source_channel_id }} ; message {{ msg.source_message_id }}
+                                        translated from : Channel "{{ msg.source_channel_id }}" ; message {{ msg.source_message_id }}
                                     {% endif %}
                                 </div>
                                 {% endif %}

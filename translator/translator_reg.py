@@ -337,18 +337,18 @@ def register_handlers(
             meta = {}
             html_text = text
 
-        # Build HTML text
+        # Build HTML text and aadd ink
         source_channel_link = (
             f'<a href="https://t.me/{msg.chat.username}">{msg.chat.title}</a>'
             if getattr(msg.chat, "username", None)
             else msg.chat.title
         )
-        html_text = html_text + f"\n\nSource channel: {source_channel_link}"
+        html_text_with_source = html_text + f"\n\nSource channel: {source_channel_link}"
         pyro_log.info("Generated HTML text for message %s: %s", msg.id, html_text)
         payload = {
             "Channel": msg.chat.title,
             "Text": text,
-            "Html": html_text,
+            "Html": html_text_with_source,
             "Link": f"https://t.me/{msg.chat.username}/{msg.id}",
             "Meta": meta
         }

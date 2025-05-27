@@ -35,7 +35,7 @@
       }
     </style>
   </head>
-  <body class="bg-gray-100 min-h-screen">
+  <body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
     <div class="container mx-auto mt-8">
       <div class="flex items-center mb-6">
         <a class="btn-back flex items-center px-2 py-2 text-gray-700 hover:bg-gray-200 transition" href="/admin" style="border: none; background: transparent;">
@@ -43,12 +43,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7l-4 4 4 4" />
           </svg>
         </a>
-        <h1 class="text-3xl font-bold mt-[-5px]">Channel Manager</h1>
+        <h1 class="text-3xl font-bold mt-[-5px]">Message Manager</h1>
       </div>
       <hr class="mb-6">
       <h2 class="text-2xl font-bold mb-6">Channel Message Translation</h2>
       <!-- Step 1: Select source channel -->
-      <form method="post" class="mb-4">
+      <form method="post" class="mb-6 bg-white shadow-lg rounded-lg p-6">
         <label for="source_channel" class="font-medium mb-1 block">Select source channel:</label>
         <select name="source_channel" id="source_channel" class="border rounded px-3 py-2 w-full md:w-auto" required>
           <option value="">-- Select --</option>
@@ -62,7 +62,7 @@
       </form>
       <!-- Step 2: Select message -->
       {% if recent_messages %}
-        <form method="post" class="mb-4" id="message-form">
+        <form method="post" class="mb-6 bg-white shadow-lg rounded-lg p-6" id="message-form">
           <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
           <label for="message_id" class="font-medium mb-1 block">Select message:</label>
           <select name="message_id" id="message_id" class="border rounded px-3 py-2 w-full md:w-auto" required onchange="updatePreviewContent()">
@@ -92,7 +92,7 @@
             </button>
           </div>
         </form>
-        <div id="preview-area" style="display:none;">
+        <div id="preview-area" class="bg-white shadow rounded-lg p-6 mb-6 hidden">
           <div class="mt-2">
             <strong>Message Preview:</strong>
             <div id="preview-content"
@@ -129,84 +129,190 @@
       {% endif %}
       <!-- Step 3: Show translation result -->
       {% if translation_result %}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-4 items-start">
-          <div class="flex flex-col h-full">
-            <div class="flex items-center mb-2">
-              <h4 class="text-lg font-semibold flex-grow">Source Message</h4>
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+            <div class="flex flex-col h-full">
+              <div class="flex items-center mb-2">
+                <h4 class="text-lg font-semibold flex-grow">Source Message</h4>
+              </div>
+              <div id="raw-html-source"
+                   class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
+                   style="white-space: pre-line; display: none;">
+                <pre class="m-0 p-0">{{ selected_message_text|trim }}</pre>
+              </div>
+              <div id="source-message-block"
+                   class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded flex flex-col justify-start">
+                <div class="h-full flex flex-col justify-start" style="white-space: pre-line;">
+                  <span class="text-left">
+                    {{ selected_message_text|trim|safe }}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div id="raw-html-source"
-                 class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                 style="white-space: pre-line; display: none;">
-              <pre class="m-0 p-0">{{ selected_message_text|trim }}</pre>
-            </div>
-            <div id="source-message-block"
-                 class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded flex flex-col justify-start">
-              <div class="h-full flex flex-col justify-start" style="white-space: pre-line;">
-                <span class="text-left">
-                  {{ selected_message_text|trim|safe }}
-                </span>
+            <div class="flex flex-col h-full">
+              <div class="flex items-center mb-2">
+                <h4 class="text-lg font-semibold flex-grow">Translation Result</h4>
+                <button type="button"
+                        class="ml-auto px-2 py-1 text-blue-600 hover:underline"
+                        onclick="
+                          const srcRaw = document.getElementById('raw-html-source');
+                          const srcBlock = document.getElementById('source-message-block');
+                          const tgtRaw = document.getElementById('raw-html-content');
+                          const tgtBlock = document.getElementById('translated-message-block');
+                          const showRaw = (srcRaw.style.display === 'none' || srcRaw.style.display === '') && (tgtRaw.style.display === 'none' || tgtRaw.style.display === '');
+                          if (showRaw) {
+                            srcRaw.style.display = 'block';
+                            srcBlock.style.display = 'none';
+                            tgtRaw.style.display = 'block';
+                            tgtBlock.style.display = 'none';
+                          } else {
+                            srcRaw.style.display = 'none';
+                            srcBlock.style.display = 'block';
+                            tgtRaw.style.display = 'none';
+                            tgtBlock.style.display = 'block';
+                          }
+                        ">
+                  Toggle Raw HTML
+                </button>
+              </div>
+              <div id="raw-html-content"
+                   class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
+                   style="white-space: pre-line; display: none;">
+                <pre class="m-0 p-0">{{ raw_html_result }}</pre>
+              </div>
+              <div id="translated-message-block"
+                   class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded">
+                <div class="mt-2 h-full" style="white-space: pre-line;">{{ raw_html_result|safe }}</div>
               </div>
             </div>
           </div>
-          <div class="flex flex-col h-full">
-            <div class="flex items-center mb-2">
-              <h4 class="text-lg font-semibold flex-grow">Translation Result</h4>
-              <button type="button"
-                      class="ml-auto px-2 py-1 text-blue-600 hover:underline"
-                      onclick="
-                        const srcRaw = document.getElementById('raw-html-source');
-                        const srcBlock = document.getElementById('source-message-block');
-                        const tgtRaw = document.getElementById('raw-html-content');
-                        const tgtBlock = document.getElementById('translated-message-block');
-                        const showRaw = (srcRaw.style.display === 'none' || srcRaw.style.display === '') && (tgtRaw.style.display === 'none' || tgtRaw.style.display === '');
-                        if (showRaw) {
-                          srcRaw.style.display = 'block';
-                          srcBlock.style.display = 'none';
-                          tgtRaw.style.display = 'block';
-                          tgtBlock.style.display = 'none';
-                        } else {
-                          srcRaw.style.display = 'none';
-                          srcBlock.style.display = 'block';
-                          tgtRaw.style.display = 'none';
-                          tgtBlock.style.display = 'block';
-                        }
-                      ">
-                Toggle Raw HTML
-              </button>
-            </div>
-            <div id="raw-html-content"
-                 class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                 style="white-space: pre-line; display: none;">
-              <pre class="m-0 p-0">{{ raw_html_result }}</pre>
-            </div>
-            <div id="translated-message-block"
-                 class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded">
-              <div class="mt-2 h-full" style="white-space: pre-line;">{{ raw_html_result|safe }}</div>
-            </div>
-          </div>
+          <div class="clearfix"></div>
         </div>
-        <div class="clearfix"></div>
-        <hr class="my-8">
-        <!-- Step 4: Select target channel and post -->
-        <form method="post" class="mb-4">
-          <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
-          <input type="hidden" name="message_id" value="{{ selected_message_id }}">
-          <label for="target_channel" class="font-medium mb-1 block">Select target channel:</label>
-          <select name="target_channel" id="target_channel" class="border rounded px-3 py-2 w-full md:w-auto" required>
-            {% for ch in target_channels %}
-              <option value="{{ ch.type }}" {% if selected_target_type == ch.type %}selected{% endif %}>{{ ch.name|e }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" class="mt-2 px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 transition">Post Translation</button>
-        </form>
-        {% if post_result %}
-          <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-2">{{ post_result }}</div>
-        {% endif %}
-        {% if delete_result %}
-          <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-2">{{ delete_result }}</div>
-        {% endif %}
+
+        <!-- New card: Select target channel and post -->
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
+          <form method="post"
+                action="/admin/manager"
+                id="translationForm"
+                class="space-y-4"
+                onsubmit="updateTargetChannelId()">
+            <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
+            <input type="hidden" name="message_id" value="{{ selected_message_id }}">
+            <input type="hidden" name="action" id="translation-action" value="">
+            <input type="hidden" name="target_channel_id" id="target_channel_id" value="">
+            <!-- carry over the translation so we don't re-run on post -->
+            <input type="hidden" name="translation_result" value="{{ translation_result|e }}">
+            <input type="hidden" name="raw_html_result" value="{{ raw_html_result|e }}">
+            <label for="target_channel" class="font-medium block">Select target channel:</label>
+            <select name="target_channel"
+                    id="target_channel"
+                    class="border rounded px-3 py-2 w-full md:w-auto"
+                    required
+                    onchange="updateTargetChannelId()">
+              {% for ch in target_channels %}
+                <option value="{{ ch.type }}" 
+                        data-channel-id="{{ ch.id }}"
+                  {% if selected_target_type == ch.type %}selected{% endif %}>
+                  {{ ch.name|e }}
+                </option>
+              {% endfor %}
+            </select>
+
+            <button type="button" id="postBtn"
+                    class="mt-2 px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 transition">
+              Post
+            </button>
+          </form>
+
+          {% if post_result %}
+            <div id="postResultBox" class="mt-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+              {{ post_result }}
+            </div>
+          {% endif %}
+          {% if delete_result %}
+            <div class="mt-2 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+              {{ delete_result }}
+            </div>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
     <div class="h-16"></div>
+    <!--  Post Validation Dialog -->
+    <div id="postDialog" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm" id="postDialogBox">
+        <div class="text-lg font-semibold mb-4 text-gray-800">Confirm Post</div>
+        <div class="mb-6 text-gray-700">Are you sure you want to post the translation?</div>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="cancelPostDialog" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
+          <button name="action" value="post" type="button" id="confirmPostDialog" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Post</button>
+        </div>
+      </div>
+    </div>
+    <!-- Add script for success pop-up after posting translation -->
+    <script>
+      // define missing function to sync hidden input with selected target channel
+      function updateTargetChannelId() {
+        var sel = document.getElementById('target_channel');
+        if (!sel) return;
+        // grab the real ID from data-channel-id
+        document.getElementById('target_channel_id').value =
+          sel.options[sel.selectedIndex].getAttribute('data-channel-id')||'';
+      }
+
+      // Custom dialog logic for post validation
+      document.addEventListener("DOMContentLoaded", function() {
+          // initialize only when select exists
+          updateTargetChannelId();
+
+          const postBtn = document.getElementById("postBtn");
+          const postDialog = document.getElementById("postDialog");
+          const postDialogBox = document.getElementById("postDialogBox");
+          const cancelBtn = document.getElementById("cancelPostDialog");
+          const confirmBtn = document.getElementById("confirmPostDialog");
+          const form = document.getElementById("translationForm");
+
+          if (postBtn && postDialog && cancelBtn && confirmBtn && form) {
+              postBtn.addEventListener("click", function(e) {
+                  e.preventDefault();
+                  document.getElementById("translation-action").value = "post";
+                  updateTargetChannelId();
+                  // log selected target channel id
+                  console.log("Selected target_channel_id:", document.getElementById("target_channel_id").value);
+                  postDialog.classList.remove("hidden");
+              });
+              cancelBtn.addEventListener("click", function() {
+                  postDialog.classList.add("hidden");
+              });
+              confirmBtn.addEventListener("click", function() {
+                  postDialog.classList.add("hidden");
+                  document.getElementById("translation-action").value = "post";
+                  updateTargetChannelId();
+                  form.submit();
+              });
+              postDialog.addEventListener("mousedown", function(e) {
+                  if (!postDialogBox.contains(e.target)) {
+                      postDialog.classList.add("hidden");
+                  }
+              });
+          }
+
+          // Success/failure pop-up after posting translation
+          const postResult = "{{ post_result }}";
+          if(postResult && postResult !== "None"){
+             const popup = document.createElement('div');
+             popup.innerText = postResult;
+             if (postResult.toLowerCase().includes("fail") || postResult.toLowerCase().includes("error")) {
+                 popup.className = "fixed top-4 right-4 bg-red-200 text-red-800 p-4 rounded shadow-lg z-50";
+             } else {
+                 popup.className = "fixed top-4 right-4 bg-green-200 text-green-800 p-4 rounded shadow-lg z-50";
+             }
+             document.body.appendChild(popup);
+             setTimeout(() => { popup.remove(); }, 3000);
+             const box = document.getElementById('postResultBox');
+             if(box) box.scrollIntoView({behavior: "smooth", block: "center"});
+          }
+      });
+    </script>
   </body>
 </html>

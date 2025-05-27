@@ -16,7 +16,7 @@
       }
     </style>
   </head>
-  <body class="bg-gray-100 min-h-screen">
+  <body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
     <div class="container mx-auto mt-8">
       <!-- Header -->
       <div class="flex items-center mb-6">
@@ -69,43 +69,45 @@
           </div>
           <a class="inline-block mt-2 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition" href="/admin/prompt">Edit Prompt Template</a>
         </div>
-        <!-- Card: ChristianVision and ShaltNotKill -->
-        <div class="bg-white shadow rounded p-6 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-              <h4 class="text-lg font-semibold mb-2">ChristianVision</h4>
-              <div class="mb-3">
-                <label class="block font-medium mb-1" for="cv_channel">CHRISTIANVISION_CHANNEL</label>
-                <input type="text" class="w-full border rounded px-3 py-2" name="cv_channel" id="cv_channel" value="{{ current_cv_channel }}">
-              </div>
-              <div class="mb-3">
-                <label class="block font-medium mb-1" for="cv_en_channel_id">CHRISTIANVISION_EN_CHANNEL_ID</label>
-                <input type="text" class="w-full border rounded px-3 py-2" name="cv_en_channel_id" id="cv_en_channel_id" value="{{ current_cv_en_channel_id }}">
-              </div>
-            </div>
-            <div>
-              <h4 class="text-lg font-semibold mb-2">ShaltNotKill</h4>
-              <div class="mb-3">
-                <label class="block font-medium mb-1" for="snk_channel">SHALTNOTKILL_CHANNEL</label>
-                <input type="text" class="w-full border rounded px-3 py-2" name="snk_channel" id="snk_channel" value="{{ current_snk_channel }}">
-              </div>
-              <div class="mb-3">
-                <label class="block font-medium mb-1" for="snk_en_channel_id">SHALTNOTKILL_EN_CHANNEL_ID</label>
-                <input type="text" class="w-full border rounded px-3 py-2" name="snk_en_channel_id" id="snk_en_channel_id" value="{{ current_snk_en_channel_id }}">
-              </div>
-            </div>
-          </div>
-        </div>
         <!-- Card: Target and Source Test IDs -->
         <div class="bg-white shadow rounded p-6 mb-6">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
+              <label class="block font-medium mb-1" for="source_test_id">SOURCE_TEST_ID</label>
+              <input type="text" class="w-full border rounded px-3 py-2" name="source_test_id" id="source_test_id" value="{{ current_source_test_id }}">
+            </div>
+            <div>
               <label class="block font-medium mb-1" for="target_channel_id">TARGET_CHANNEL_ID</label>
               <input type="text" class="w-full border rounded px-3 py-2" name="target_channel_id" id="target_channel_id" value="{{ current_target_channel_id }}">
             </div>
-            <div>
-              <label class="block font-medium mb-1" for="source_test_id">SOURCE_TEST_ID</label>
-              <input type="text" class="w-full border rounded px-3 py-2" name="source_test_id" id="source_test_id" value="{{ current_source_test_id }}">
+          </div>
+        </div>
+        <!-- Card: ChristianVision and ShaltNotKill -->
+        <div class="bg-white shadow rounded p-6 mb-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="pr-8 md:pr-16">
+              <h4 class="text-lg font-semibold mb-2">ChristianVision</h4>
+              <div class="mb-6">
+                <label class="block font-medium mb-1" for="cv_channel">CHRISTIANVISION_CHANNEL</label>
+                <input type="text" class="w-full border rounded px-3 py-2" name="cv_channel" id="cv_channel" value="{{ current_cv_channel }}">
+              </div>
+              <div class="mb-6">
+                <label class="block font-medium mb-1" for="cv_en_channel_id">CHRISTIANVISION_EN_CHANNEL_ID</label>
+                <input type="text" class="w-full border rounded px-3 py-2" name="cv_en_channel_id" id="cv_en_channel_id" value="{{ current_cv_en_channel_id }}">
+              </div>
+            </div>
+            <div class="relative pr-8 md:pr-16">
+              <!-- Vertical separator for md and up -->
+              <div class="hidden md:block absolute left-0 top-0 h-full w-px bg-gray-300" style="left: -2rem;"></div>
+              <h4 class="text-lg font-semibold mb-2">ShaltNotKill</h4>
+              <div class="mb-6">
+                <label class="block font-medium mb-1" for="snk_channel">SHALTNOTKILL_CHANNEL</label>
+                <input type="text" class="w-full border rounded px-3 py-2" name="snk_channel" id="snk_channel" value="{{ current_snk_channel }}">
+              </div>
+              <div class="mb-6">
+                <label class="block font-medium mb-1" for="snk_en_channel_id">SHALTNOTKILL_EN_CHANNEL_ID</label>
+                <input type="text" class="w-full border rounded px-3 py-2" name="snk_en_channel_id" id="snk_en_channel_id" value="{{ current_snk_en_channel_id }}">
+              </div>
             </div>
           </div>
         </div>
