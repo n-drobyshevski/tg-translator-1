@@ -111,10 +111,14 @@ def test_translation():
             msg = {
                 "Channel": "Test Channel",
                 "Text": input_text,
+                "Html": input_text,
                 "Link": "https://example.com",
             }
-            translation_result = translator.translator_reg.translate_message_sync(
-                anthropic_client, msg
+            # Use the async translate_html function in a synchronous context
+            import asyncio
+
+            translation_result = asyncio.run(
+                translator.translator_reg.translate_html(anthropic_client, msg)
             )
         except Exception as e:
             translation_result = f"Error during translation: {e}"

@@ -10,6 +10,7 @@
       body {
         font-family: 'Roboto', sans-serif;
       }
+      /* Remove #loading_spinner CSS here, handled in component */
       .toggle-btn {
         margin-bottom: 0.5em;
       }
@@ -78,7 +79,7 @@
           </select>
           <div class="flex gap-2 mt-2 flex-wrap">
             {% if not selected_channel_is_en %}
-              <button type="submit" name="action" value="translate" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-2">
+              <button type="submit" name="action" value="translate" id="translate_btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-2">
                 <i class="fa-regular fa-paper-plane"></i>
                 Translate
               </button>
@@ -275,6 +276,8 @@
       {% endif %} 
       
     </div>
+    {% set spinner_text = "Processing... Please wait." %}
+    {% include 'components/spinner_loader.html' %}
     <div class="h-16"></div>
     <!--  Post Validation Dialog -->
     <div id="postDialog" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
@@ -358,6 +361,46 @@
              const box = document.getElementById('postResultBox');
              if(box) box.scrollIntoView({behavior: "smooth", block: "center"});
           }
+      });
+
+      // Show spinner loader for all translation and post actions
+      function showSpinner(text) {
+        var spinner = document.getElementById('loading_spinner');
+        var spinnerText = document.getElementById('loading_spinner_text');
+        if (spinnerText && text) spinnerText.textContent = text;
+        if (spinner) spinner.classList.remove('hidden');
+      }
+
+      function hideSpinner() {
+        var spinner = document.getElementById('loading_spinner');
+        if (spinner) spinner.classList.add('hidden');
+      }
+
+      document.addEventListener("DOMContentLoaded", function() {
+        var translateBtn = document.getElementById('translate_btn');
+        if (translateBtn) {
+          translateBtn.addEventListener('click', function() {
+            showSpinner("Translating... Please wait. This may take a few seconds.");
+          });
+        }
+
+        var saveTranslateBtn = document.querySelector('#source-edit-area button[onclick*="saveSourceEdit"]');
+        if (saveTranslateBtn) {
+          saveTranslateBtn.addEventListener('click', function() {
+            showSpinner("Translating and saving... Please wait.");
+          });
+        }
+
+        var postBtn = document.getElementById("postBtn");
+        var confirmBtn = document.getElementById("confirmPostDialog");
+        if (postBtn && confirmBtn) {
+          postBtn.addEventListener("click", function() {
+            // spinner will be shown on confirm
+          });
+          confirmBtn.addEventListener("click", function() {
+            showSpinner("Posting translation... Please wait.");
+          });
+        }
       });
 
       function toggleSourceEditMode() {

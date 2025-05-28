@@ -12,15 +12,6 @@
         border-radius: 50px;
         padding: 0.5rem 1rem;
       }
-     
-      #loading_spinner {
-        position: fixed;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1050;
-        display: none;
-      }
     </style>
   </head>
   <body class="bg-gray-100 min-h-screen">
@@ -99,15 +90,8 @@
       </div>
     </div>
     <!-- Spinner -->
-    <div id="loading_spinner">
-      <div class="bg-blue-100 border border-blue-300 text-blue-700 px-4 py-2 rounded flex items-center gap-2">
-        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-        </svg>
-        <span>Translating... Please wait.</span>
-      </div>
-    </div>
+    {% set spinner_text = "Translating... Please wait. This may take a few seconds." %}
+    {% include 'components/spinner_loader.html' %}
     <div style="height: 25px;"></div>
     <script>
       // Clear the translation message field on button click
@@ -123,7 +107,12 @@
       // Show spinner when the Translate form is submitted
       document.getElementById('translation_form').addEventListener('submit', function(event) {
         event.preventDefault();
-        document.getElementById('loading_spinner').style.display = 'block';
+        var spinner = document.getElementById('loading_spinner');
+        var spinnerText = document.getElementById('loading_spinner_text');
+        if (spinnerText) {
+          spinnerText.textContent = "Translating... Please wait. This may take a few seconds.";
+        }
+        if (spinner) spinner.classList.remove('hidden');
         this.submit();
       });
 
