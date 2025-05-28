@@ -1,28 +1,158 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Admin Stats</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto mt-8">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-3xl font-bold">Stats Dashboard</h1>
-        <a href="{{ url_for('admin_bp.admin_dashboard') }}"
-           class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
-          Back
-        </a>
-      </div>
-      <hr class="mb-6">
-      {% for event_type, records in stats.items() %}
-        <h2 class="text-2xl font-semibold mt-4 mb-2">{{ event_type | capitalize }}</h2>
-        {% if records %}
-          <pre class="bg-white p-4 rounded shadow overflow-auto">{{ records | tojson(indent=2) }}</pre>
-        {% else %}
-          <p class="italic text-gray-500">No records.</p>
-        {% endif %}
-      {% endfor %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Translator Event Cards</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-100 text-gray-900">
+
+  <div class="container mx-auto p-4">
+    <div class="flex items-center mb-6">
+      {% set href = '/admin' %}
+      {% include 'components/back_button.html' %}
+      <h1 class="text-3xl font-bold mt-[-5px]">Translator Events</h1>
     </div>
-  </body>
+    <hr class="mb-6">
+    <!-- Cards column -->
+    <div id="cardGrid" class="flex flex-col gap-8 mt-8">
+      <!-- cards injected by JS -->
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 1. Fetch the latest 100 events.
+     *    Replace the URL with your real endpoint (e.g., /api/metrics/detail?mode=events).
+     */
+    async function loadEvents() {
+      const res  = await fetch("/admin/stats/detail");
+      if (!res.ok) throw new Error(res.statusText);
+      const json = await res.json();
+      // Assume API returns {"events_last_100":[ {...}, {...} ]}
+      return json.events_last_100 || [];
+    }
+
+    /**
+     * 2. Turn a single event object into a <div> card.
+     */
+    function buildCard(ev) {
+      // Utility: yes/no → coloured badge
+      const badge = (bool) =>
+        bool === true  ? '<span class="px-2 py-0.5 text-xs  text-green-700 rounded-full  shadow-sm">✔</span>' :
+        bool === false ? '<span class="px-2 py-0.5 text-xs  text-red-700 rounded-full  shadow-sm">✖</span>'  : '';
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "bg-white rounded-xl shadow p-3 flex flex-col space-y-2 border border-gray-100 hover:shadow-xl transition-shadow duration-200 w-full";
+
+      // Collapsed card content (summary, now more horizontal and wide-friendly)
+      const summaryHTML = `
+        <div class="flex flex-wrap items-center justify-between mb-2">
+          <div class="flex items-center space-x-2">
+            ${ev.message_id ? `<span class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-mono font-semibold">#${ev.message_id}</span>` : ""}
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">${ev.event || "create"}</span>
+            <span class="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-semibold border border-gray-200">
+              Media: ${ev.media_type || "text"}
+            </span>
+            ${ev.file_size_bytes ? `<span class="inline-block px-2 py-0.5 rounded bg-gray-50 text-gray-500 text-xs">${(ev.file_size_bytes/1024).toFixed(1)} KB</span>` : ""}
+            <span class="text-xs text-gray-400">${new Date(ev.timestamp).toLocaleString()}</span>
+          </div>
+          <div class="flex items-center space-x-1">
+            <span class="font-semibold text-gray-700">Posted:</span>
+            ${badge(ev.posting_success)}
+          </div>
+        </div>
+        <div class="flex flex-row flex-wrap gap-2 mt-1">
+          <!-- Channels group -->
+          <div class="bg-gray-50 rounded px-2 py-1 flex items-center border border-gray-100 min-w-[180px]">
+            <span class="font-semibold text-gray-700">Channels:</span>
+            <span class="text-blue-700 font-semibold ml-1">Src:</span>
+            <span class="text-blue-900 ml-1">${ev.source_channel_name || ev.source_channel}</span>
+            <span class="mx-1 text-gray-500 font-bold">→</span>
+            <span class="text-blue-700 font-semibold">Dst:</span>
+            <span class="text-blue-900 ml-1">${ev.dest_channel_name || ev.dest_channel}</span>
+          </div>
+          <!-- Size group -->
+          <div class="bg-blue-50 rounded px-2 py-1 flex items-center border border-blue-100 min-w-[120px]">
+            <span class="font-semibold text-blue-700">Size:</span>
+            <span class="text-blue-700 ml-1">RU/BE</span>
+            <span class="text-blue-900 ml-1">${ev.original_size}</span>
+            <span class="text-blue-700 ml-1">EN</span>
+            <span class="text-blue-900 ml-1">${ev.translated_size}</span>
+            ${ev.file_size_bytes ? `<span class="ml-1 text-blue-700">Media:</span> <span class="text-blue-900">${(ev.file_size_bytes/1024).toFixed(1)} KB</span>` : ""}
+          </div>
+          <!-- Performance group -->
+          <div class="bg-green-50 rounded px-2 py-1 flex items-center border border-green-100 min-w-[100px]">
+            <span class="font-semibold text-green-700">Latency:</span>
+            <span class="text-green-900 ml-1">${ev.translation_time ?? "—"}s</span>
+            <span class="font-semibold text-green-700 ml-2">Retries:</span>
+            <span class="text-green-900 ml-1">${ev.retry_count ?? 0}</span>
+          </div>
+          <!-- Error group -->
+          ${(ev.api_error_code || ev.exception_message) ? `
+          <div class="bg-red-50 rounded px-2 py-1 border border-red-100 min-w-[80px]">
+            ${ev.api_error_code ? `<div class="text-xs text-red-600">Error ${ev.api_error_code}</div>` : ""}
+            ${ev.exception_message ? `<div class="text-xs text-red-500">${ev.exception_message}</div>` : ""}
+          </div>
+          ` : ""}
+        </div>
+        <button class="show-details-btn mt-2 px-3 py-1 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold shadow hover:bg-gray-200 hover:border-gray-400 transition self-end flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+          Show details
+        </button>
+      `;
+
+      // Expanded card content (all fields)
+      const detailsHTML = `
+        <div class="overflow-x-auto mt-2">
+          <table class="min-w-full text-xs text-left border-t border-gray-200">
+            <tbody>
+              ${Object.entries(ev).map(([k, v]) =>
+                `<tr>
+                  <td class="pr-2 py-1 text-gray-500 font-mono">${k}</td>
+                  <td class="py-1 text-gray-900 font-mono">${typeof v === "object" ? JSON.stringify(v) : (v ?? "<i>null</i>")}</td>
+                </tr>`
+              ).join("")}
+            </tbody>
+          </table>
+        </div>
+        <button class="hide-details-btn mt-2 px-4 py-1 bg-white border border-gray-400 text-gray-700 rounded-lg text-xs font-bold shadow hover:bg-gray-50 hover:border-gray-600 transition self-end flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+          Hide details
+        </button>
+      `;
+
+      wrapper.innerHTML = summaryHTML;
+
+      // Toggle logic
+      wrapper.querySelector(".show-details-btn").onclick = function () {
+        wrapper.innerHTML = detailsHTML;
+        wrapper.querySelector(".hide-details-btn").onclick = function () {
+          wrapper.innerHTML = summaryHTML;
+          wrapper.querySelector(".show-details-btn").onclick = arguments.callee.caller;
+        };
+      };
+
+      return wrapper;
+    }
+
+    /**
+     * 3. Main: fetch → build cards → inject.
+     */
+    (async () => {
+      try {
+        const events = await loadEvents();
+        const grid   = document.getElementById("cardGrid");
+
+        events.forEach(ev => grid.appendChild(buildCard(ev)));
+      } catch (err) {
+        console.error("Failed to load events:", err);
+        document.getElementById("cardGrid").innerHTML =
+          '<p class="text-red-600">Failed to fetch event data.</p>';
+      }
+    })();
+  </script>
+</body>
 </html>
