@@ -38,11 +38,8 @@
   <body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
     <div class="container mx-auto mt-8">
       <div class="flex items-center mb-6">
-        <a class="btn-back flex items-center px-2 py-2 text-gray-700 hover:bg-gray-200 transition" href="/admin" style="border: none; background: transparent;">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-8 h-8">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7l-4 4 4 4" />
-          </svg>
-        </a>
+        {% set href = '/admin' %}
+        {% include 'components/back_button.html' %}
         <h1 class="text-3xl font-bold mt-[-5px]">Message Manager</h1>
       </div>
       <hr class="mb-6">

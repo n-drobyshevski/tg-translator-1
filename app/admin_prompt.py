@@ -26,7 +26,7 @@ TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 @admin_prompt_bp.route("/admin/prompt", methods=["GET"])
 @login_required
 def modify_prompt():
-    current_prompt = TEMPLATE_PATH.read_text()
+    current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
     return render_template(
         "admin_prompt_edit.html", current_prompt=current_prompt, message=""
     )
@@ -38,7 +38,7 @@ def save_prompt():
     new_prompt = request.form.get("prompt_text", "")
     if not new_prompt:
         return jsonify(error="No prompt provided"), 400
-    TEMPLATE_PATH.write_text(new_prompt)
+    TEMPLATE_PATH.write_text(new_prompt, encoding="utf-8")
     return jsonify(message="Prompt template updated successfully.")
 
 
@@ -56,7 +56,7 @@ def get_last_telegram_post():
         channel_id = int(channel_env)
     except Exception as e:
         sample_data = f"Invalid channel id: {e}"
-        current_prompt = TEMPLATE_PATH.read_text()
+        current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
         return render_template(
             "admin_prompt_edit.html",
             current_prompt=current_prompt,
@@ -90,7 +90,7 @@ def get_last_telegram_post():
     except Exception as e:
         last_post = f"Error retrieving last post: {e}"
 
-    current_prompt = TEMPLATE_PATH.read_text()
+    current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
     return render_template(
         "admin_prompt_edit.html",
         current_prompt=current_prompt,
@@ -119,7 +119,7 @@ def test_translation():
         except Exception as e:
             translation_result = f"Error during translation: {e}"
 
-    current_prompt = TEMPLATE_PATH.read_text()
+    current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
     return render_template(
         "admin_prompt_edit.html",
         current_prompt=current_prompt,
