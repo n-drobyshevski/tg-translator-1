@@ -8,7 +8,8 @@ from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
 from admin_config import admin_config_bp  
 from admin_manager import admin_manager_bp
-from admin_cache import admin_cache_bp 
+from admin_cache import admin_cache_bp
+from admin_stats import admin_stats_bp
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -66,6 +67,7 @@ app.register_blueprint(admin_prompt_bp)
 app.register_blueprint(admin_config_bp)  # add this
 app.register_blueprint(admin_manager_bp)  # renamed blueprint
 app.register_blueprint(admin_cache_bp)  # register cache blueprint
+app.register_blueprint(admin_stats_bp)  # register stats blueprint
 
 TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 

@@ -1,4 +1,3 @@
-
 """
 Bidirectional Pyrogram ⇆ PTB relay bot.
 
@@ -42,8 +41,14 @@ except ImportError:  # pragma: no cover
 # Import TelegramSender with fallback
 try:
     from .telegram_sender import TelegramSender  # type: ignore
-except ImportError:  # pragma: no cover
-    from telegram_sender import TelegramSender  # type: ignore
+except ImportError:
+    from translator.telegram_sender import TelegramSender  # type: ignore
+
+try:
+    from .stats_logger import record_event, build_event_kwargs
+except ImportError:
+    from translator.stats_logger import record_event, build_event_kwargs
+import time
 
 
 ###############################################################################
@@ -282,12 +287,35 @@ def register_handlers(pyro: Client, anthropic: Anthropic, sender: TelegramSender
         text = msg.text or msg.caption or ""
         # Determine small file_id
         file_id: str | None = None
+        file_size_bytes = None
+        media_type = "text"
         if msg.document and msg.document.file_size <= max_size:
             file_id = msg.document.file_id
+            file_size_bytes = msg.document.file_size
+            media_type = "doc"
         elif msg.photo and getattr(msg.photo, "file_size", 0) <= max_size:
             file_id = msg.photo.file_id
+            file_size_bytes = getattr(msg.photo, "file_size", None)
+            media_type = "photo"
         elif msg.video and msg.video.file_size <= max_size:
             file_id = msg.video.file_id
+            file_size_bytes = msg.video.file_size
+            media_type = "video"
+        else:
+            media_type = "text"
+
+        msg_id = getattr(msg, "id", None)
+        if msg_id is None:
+            msg_id = getattr(msg, "message_id", None)
+
+        translation_start = time.monotonic()
+        retry_count = 0
+        translation_time = None
+        translated = ""
+        exception_message = None
+        api_error_code = None
+        posting_success = False
+        total_time = None
 
         # Request metadata from PTB
         req = MetadataRequest(msg.chat.id, msg.id, file_id)
@@ -315,11 +343,93 @@ def register_handlers(pyro: Client, anthropic: Anthropic, sender: TelegramSender
         }
 
         try:
-            translated = await translate_html(anthropic, payload)
+            for attempt in range(1, 4):
+                try:
+                    translated = await translate_html(anthropic, payload)
+                    translation_time = time.monotonic() - translation_start
+                    retry_count = attempt - 1
+                    break
+                except Exception as e:
+                    if attempt == 3:
+                        raise
+                    retry_count = attempt
+                    await asyncio.sleep(2)
             pyro_log.info("Translated message: %s", translated)
             await sender.send_message(translated, target)
+            posting_success = True
+            total_time = (time.monotonic() - translation_start)
+            if record_event:
+                record_event(
+                    **build_event_kwargs(
+                        event_type="translated",
+                        source_channel=str(msg.chat.id),
+                        dest_channel=target,
+                        message_id=str(msg_id),
+                        media_type=media_type,
+                        file_size_bytes=file_size_bytes,
+                        original_size=len(text),
+                        translated_size=len(translated),
+                        translation_time=translation_time,
+                        retry_count=retry_count,
+                        posting_success=None,
+                        api_error_code=None,
+                        exception_message=None,
+                        total_time=None,
+                        event=None,
+                        edit_timestamp=None,
+                        previous_size=None,
+                        new_size=None,
+                    )
+                )
+                record_event(
+                    **build_event_kwargs(
+                        event_type="posted",
+                        source_channel=str(msg.chat.id),
+                        dest_channel=target,
+                        message_id=str(msg_id),
+                        media_type=media_type,
+                        file_size_bytes=file_size_bytes,
+                        original_size=len(text),
+                        translated_size=len(translated),
+                        translation_time=translation_time,
+                        retry_count=retry_count,
+                        posting_success=posting_success,
+                        api_error_code=api_error_code,
+                        exception_message=exception_message,
+                        total_time=total_time,
+                        event=None,
+                        edit_timestamp=None,
+                        previous_size=None,
+                        new_size=None,
+                    )
+                )
             pyro_log.info("DONE %s → %s", msg.id, target)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
+            exception_message = str(exc)
+            api_error_code = getattr(exc, "status", None)
+            if record_event:
+                record_event(
+                    **build_event_kwargs(
+                        event_type="translated",
+                        source_channel=str(msg.chat.id),
+                        dest_channel=target,
+                        message_id=str(msg_id),
+                        media_type=media_type,
+                        file_size_bytes=file_size_bytes,
+                        original_size=len(text),
+                        translated_size=len(translated) if translated else 0,
+                        translation_time=translation_time,
+                        retry_count=retry_count,
+                        posting_success=False,
+                        api_error_code=api_error_code,
+                        exception_message=exception_message,
+                        total_time=None,
+                        event=None,
+                        edit_timestamp=None,
+                        previous_size=None,
+                        new_size=None,
+                    )
+                )
             pyro_log.error("FAILED %s: %s", msg.id, exc)
         pyro_log.info("=============================================")
         pyro_log.info("==== END HANDLING MESSAGE %s ====", msg.id)

@@ -8,8 +8,15 @@ Bidirectional Pyrogram ⇆ PTB relay bot.
 • Pyrogram дожидается future, обогащает сообщение и переводит/пересылает.
 
 """
-
 from __future__ import annotations
+# Allow running the file directly: add repo root to sys.path
+if __package__ is None:  # running as __main__
+    import pathlib, sys
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(ROOT))
+    __package__ = "translator"  # so relative imports work
+
 
 import asyncio
 import html
@@ -18,6 +25,7 @@ import os
 import requests
 import signal
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,7 +34,6 @@ from dotenv import load_dotenv
 from pyrogram import filters
 from pyrogram.client import Client
 from pyrogram.enums import MessageEntityType
-from pyrogram.types import MessageEntity
 from telegram.error import TelegramError
 from telegram.ext import Application
 
@@ -39,14 +46,20 @@ except ImportError:  # pragma: no cover
 # Import TelegramSender with fallback
 try:
     from .telegram_sender import TelegramSender  # type: ignore
-except ImportError:  # pragma: no cover
-    from telegram_sender import TelegramSender  # type: ignore
+except (ImportError, SystemError):
+    from translator.telegram_sender import TelegramSender  # type: ignore
 
 # Import channel_logger with explicit relative import for package context
 try:
-    from .channel_logger import register_channel_logger, check_deleted_messages, store_message
-except ImportError:
-    from channel_logger import register_channel_logger, check_deleted_messages, store_message
+    from .channel_logger import store_message
+except (ImportError, SystemError):
+    from translator.channel_logger import store_message
+
+# Import record_event for statistics logging
+try:
+    from .stats_logger import record_event, build_event_kwargs
+except (ImportError, SystemError):
+    from translator.stats_logger import record_event, build_event_kwargs
 
 
 ###############################################################################
@@ -315,12 +328,22 @@ def register_handlers(
         text = msg.text or msg.caption or ""
         # Determine small file_id
         file_id: str | None = None
+        file_size_bytes = None
+        media_type = "text"
         if msg.document and msg.document.file_size <= max_size:
             file_id = msg.document.file_id
+            file_size_bytes = msg.document.file_size
+            media_type = "doc"
         elif msg.photo and getattr(msg.photo, "file_size", 0) <= max_size:
             file_id = msg.photo.file_id
+            file_size_bytes = getattr(msg.photo, "file_size", None)
+            media_type = "photo"
         elif msg.video and msg.video.file_size <= max_size:
             file_id = msg.video.file_id
+            file_size_bytes = msg.video.file_size
+            media_type = "video"
+        else:
+            media_type = "text"
 
         # Request metadata from PTB
         req = MetadataRequest(msg.chat.id, msg.id, file_id)
@@ -367,8 +390,41 @@ def register_handlers(
         }
         store_message(msg.chat.id, msg_data)
 
+        # --- Timing and retry tracking ---
+        translation_start = time.monotonic()
+        retry_count = 0
+        translation_time = None
+        translated = ""
+        exception_message = None
+        api_error_code = None
+        posting_success = False
+
+        # --- Channel name extraction for stats ---
+        source_channel_id = str(msg.chat.id)  # always use id for source_channel
+        source_channel_name = getattr(msg.chat, "title", None)
+        dest_channel_name = target  # fallback: use mapping key as name
+        # Find destination channel id for stats
+        dest_channel_id = None
+        for k, v in mapping.items():
+            if v == target:
+                dest_channel_id = str(k)
+                break
+        if dest_channel_id is None:
+            dest_channel_id = ""  # fallback: empty string if not found
+
         try:
-            translated = await run_with_retries(translate_html, anthropic, payload)
+            # Translation with retries
+            for attempt in range(1, 4):
+                try:
+                    translated = await translate_html(anthropic, payload)
+                    translation_time = time.monotonic() - translation_start
+                    retry_count = attempt - 1
+                    break
+                except Exception as e:
+                    if attempt == 3:
+                        raise
+                    retry_count = attempt
+                    await asyncio.sleep(2)
             pyro_log.info("Translated message: %s", translated)
             # Store destination message inside TelegramSender
             cache_meta = {
@@ -376,9 +432,65 @@ def register_handlers(
                 "source_msg": msg,
                 "source_html": html_text,
             }
-            await run_with_retries(sender.send_message, translated, target, cache_meta)
+            post_start = time.monotonic()
+            posting_success, dest_channel_id_actual = await run_with_retries(
+                sender.send_message, translated, target, cache_meta
+            )
+            # Use the actual dest_channel_id returned by send_message if available
+            dest_channel_id_to_log = str(dest_channel_id_actual) if dest_channel_id_actual else ""
+
+            if record_event:
+                record_event(
+                    **build_event_kwargs(
+                        event_type="message",
+                        source_channel=source_channel_id,
+                        dest_channel=dest_channel_id_to_log,
+                        source_channel_name=source_channel_name,
+                        dest_channel_name=dest_channel_name,
+                        message_id=str(msg_id),
+                        media_type=media_type,
+                        file_size_bytes=file_size_bytes,
+                        original_size=len(text),
+                        translated_size=len(translated),
+                        translation_time=translation_time,
+                        retry_count=retry_count,
+                        posting_success=posting_success,
+                        api_error_code=api_error_code,
+                        exception_message=exception_message,
+                        event=None,
+                        edit_timestamp=None,
+                        previous_size=None,
+                        new_size=None,
+                    )
+                )
             pyro_log.info("DONE %s → %s", msg.id, target)
         except Exception as exc:
+            exception_message = str(exc)
+            api_error_code = getattr(exc, "status", None)
+            if record_event:
+                record_event(
+                    **build_event_kwargs(
+                        event_type="message",
+                        source_channel=source_channel_id,
+                        dest_channel=dest_channel_id,
+                        source_channel_name=source_channel_name,
+                        dest_channel_name=dest_channel_name,
+                        message_id=str(msg_id),
+                        media_type=media_type,
+                        file_size_bytes=file_size_bytes,
+                        original_size=len(text),
+                        translated_size=len(translated) if translated else 0,
+                        translation_time=translation_time,
+                        retry_count=retry_count,
+                        posting_success=False,
+                        api_error_code=api_error_code,
+                        exception_message=exception_message,
+                        event=None,
+                        edit_timestamp=None,
+                        previous_size=None,
+                        new_size=None,
+                    )
+                )
             pyro_log.error("FAILED %s: %s", msg.id, exc)
         pyro_log.info("=============================================")
         pyro_log.info("==== END HANDLING MESSAGE %s ====", msg.id)

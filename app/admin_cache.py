@@ -66,7 +66,7 @@ def show_cache():
     try:
         from translator.channel_logger import CACHE_DIR
     except ImportError:
-        CACHE_DIR = "cache"
+        from channel_logger import CACHE_DIR
     cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
     cache_data = {}
     error = None

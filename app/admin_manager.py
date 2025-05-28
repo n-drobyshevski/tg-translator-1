@@ -5,7 +5,10 @@ import asyncio
 from pathlib import Path
 from flask_login import login_required  
 import bleach
-from translator.channel_logger import get_last_messages, check_deleted_messages, store_message   # add store_message
+try:
+    from translator.channel_logger import get_last_messages, check_deleted_messages, store_message
+except ImportError:
+    from channel_logger import get_last_messages, check_deleted_messages, store_message
 import datetime                                                                                 # add datetime
 
 from anthropic import Anthropic
