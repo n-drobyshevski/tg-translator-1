@@ -64,10 +64,17 @@
       {% if recent_messages %}
         <form method="post" class="mb-6 bg-white shadow-lg rounded-lg p-6" id="message-form">
           <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
+
           <label for="message_id" class="font-medium mb-1 block">Select message:</label>
-          <select name="message_id" id="message_id" class="border rounded px-3 py-2 w-full md:w-auto" required onchange="updatePreviewContent()">
+          <select name="message_id"
+                  id="message_id"
+                  class="border rounded px-3 py-2 w-full md:w-auto"
+                  required
+                  onchange="updatePreviewContent();">
             {% for msg in recent_messages %}
-              <option value="{{ msg.id }}" data-full="{{ msg.html|e }}" {% if selected_message_id == msg.id|string %}selected{% endif %}>
+              <option value="{{ msg.id }}"
+                      data-full="{{ msg.html|e }}"
+                      {% if selected_message_id == msg.id|string %}selected{% endif %}>
                 {{ msg.timestamp }} | {{ msg.html|truncate(80) }}
               </option>
             {% endfor %}
@@ -116,8 +123,10 @@
             var select = document.getElementById('message_id');
             var selected = select.options[select.selectedIndex];
             var content = selected.getAttribute('data-full') || '';
-            // Render as HTML
             document.getElementById('preview-content').innerHTML = content;
+            // sync hidden message_id for posting/editing
+            var hidden = document.getElementById('translation_message_id');
+            if (hidden) hidden.value = select.value;
           }
           // Initialize preview content on page load if preview is visible
           document.addEventListener('DOMContentLoaded', function() {
@@ -217,7 +226,7 @@
                 class="space-y-4"
                 onsubmit="updateTargetChannelId()">
             <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
-            <input type="hidden" name="message_id" value="{{ selected_message_id }}">
+            <input type="hidden" id="translation_message_id" name="message_id" value="{{ selected_message_id }}">
             <input type="hidden" name="action" id="translation-action" value="">
             <input type="hidden" name="target_channel_id" id="target_channel_id" value="">
             <input type="hidden" name="translation_result" value="{{ translation_result|e }}">
@@ -333,7 +342,15 @@
           const postResult = "{{ post_result }}";
           if(postResult && postResult !== "None"){
              const popup = document.createElement('div');
-             popup.innerText = postResult;
+
+  // Include selected channel in success message
+  let channelText = '';
+  const sc = document.getElementById('source_channel');
+  if (sc) {
+    channelText = sc.options[sc.selectedIndex].textContent.trim();
+  }
+
+  popup.innerText = postResult + ' (Channel: ' + channelText + ')';
              if (postResult.toLowerCase().includes("fail") || postResult.toLowerCase().includes("error")) {
                  popup.className = "fixed top-4 right-4 bg-red-200 text-red-800 p-4 rounded shadow-lg z-50";
              } else {
@@ -370,15 +387,23 @@
       function saveSourceEdit() {
         var textarea = document.getElementById('source-edit-textarea');
         var content = textarea.value;
-        // Set the textarea value to a hidden input and submit a form to trigger translation
+        var messageId = document.getElementById('message_id').value;
+        var sourceChannel = document.getElementById('source_channel').value;
+
+        // Optimistically update the translated-message-block with a loading state
+        var tBlock = document.getElementById('translated-message-block');
+        if (tBlock) {
+          tBlock.innerHTML = '<div class="text-gray-500 italic">Translating...</div>';
+        }
+
         var form = document.createElement('form');
         form.method = 'post';
         form.action = window.location.pathname;
-        // Add all needed hidden fields
+
         [
-          ['source_channel', document.getElementById('source_channel').value],
-          ['message_id', document.getElementById('message_id').value],
-          ['action', 'translate'],
+          ['source_channel', sourceChannel],
+          ['message_id',    messageId],
+          ['action',        'translate'],
           ['edited_source', content]
         ].forEach(function(pair) {
           var input = document.createElement('input');
@@ -387,6 +412,14 @@
           input.value = pair[1];
           form.appendChild(input);
         });
+
+        // Let server know we want to see updated translation on reload
+        var showResult = document.createElement('input');
+        showResult.type = 'hidden';
+        showResult.name = 'show_result';
+        showResult.value = '1';
+        form.appendChild(showResult);
+
         document.body.appendChild(form);
         form.submit();
       }

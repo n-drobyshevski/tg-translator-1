@@ -237,6 +237,7 @@ async def translate_html(client: Anthropic, payload: Dict[str, Any]) -> str:
         temperature=0,
         messages=[{"role": "user", "content": prompt}],
     )
+    # Instead of slicing resp (which may be non-subscriptable), convert to string
     return resp.content[0].text
 
 

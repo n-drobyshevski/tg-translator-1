@@ -19,6 +19,7 @@ paragraph‑by‑paragraph, following all nine rules:
    <a href='URL'>URL</a> including the original URL string.
 8. **Hashtags** (e.g. #Минск, #news) must appear unchanged in the translation.
 9. Keep all other URLs unchanged and preserve any punctuation or emoji.
+10. Preserve the original content at maximum, retaining any repeating parts.
 </instructions>
 
 <example>

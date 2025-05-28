@@ -132,7 +132,7 @@ def channel_translate():
                 ts = raw_ts
             recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
         # Only keep the last 10 (should already be limited by logger, but for safety)
-        recent_messages = recent_messages[:10]
+        # recent_messages = recent_messages[:10]
 
     # Step 2: Select message and translate
     if selected_channel_id and selected_message_id:
@@ -189,7 +189,6 @@ def channel_translate():
                 except ValueError:
                     ts = raw_ts
                 recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
-            recent_messages = recent_messages[:10]
             # Reset selected_message_id so dropdown is updated and nothing is selected
             return render_template(
                 "admin_manager.html",
@@ -221,12 +220,11 @@ def channel_translate():
                 break
 
         edited_source = request.form.get("edited_source") if request.method == "POST" else None
-        # Use edited source if present
         if edited_source:
             selected_message_text = edited_source
 
-        # Only translate when user explicitly clicks "translate"
-        if selected_message_text and not selected_channel_is_en and action == "translate":
+        # Allow either "translate" or "save-translate" to trigger translation
+        if selected_message_text and not selected_channel_is_en and action in ["translate", "save-translate"]:
             try:
                 print(f"[ADMIN] Translating message {selected_message_id} from channel {selected_channel_id}")
                 # --- Use build_prompt and translate_html from translator_reg ---
@@ -253,7 +251,7 @@ def channel_translate():
                 )
                 import re
                 translation_result = re.sub(r'(</[a-z]+>)+$', '', translation_result)
-                print(f"[TRANSLATE] Translation result: {translation_result[:200]}")
+                print(f"[TRANSLATE] Translation result: {translation_result[:400]}")
                 raw_html_result = bleach.clean(translation_result, tags=["b", "i", "u", "a", "p", "br"], attributes={"a": ["href"]})
                 rendered_html_result = translation_result
                 print(f"[ADMIN] Translation completed for message {selected_message_id} from channel {selected_channel_id}")
@@ -276,7 +274,7 @@ def channel_translate():
             except ValueError:
                 ts = raw_ts
             recent_messages.append({"id": msg_id, "html": html, "timestamp": ts})
-        recent_messages = recent_messages[:10]
+        # recent_messages = recent_messages[:10]
 
     # Step 3: Post to target channel if requested
     if action == "post":
@@ -292,32 +290,22 @@ def channel_translate():
                 edit_mode = request.form.get("edit_mode")
                 print(f"[DEBUG] edit_mode: {edit_mode}")
                 if edit_mode:
-                    # Edit any available message in the target channel (prefer the most recent)
+                    # Edit the message matching source_channel_id and source_message_id
                     last_msgs = get_last_messages(selected_target_channel_id)
-                    print(f"[DEBUG] last_msgs for channel {selected_target_channel_id}: {last_msgs}")
                     msg_id = None
-                    if last_msgs:
-                        # Try to find a message to edit (prefer the most recent with a valid message_id)
-                        for msg in reversed(last_msgs):
-                            print(f"[DEBUG] Checking msg: {msg}")
-                            if msg.get("message_id"):
-                                msg_id = msg.get("message_id")
-                                print(f"[DEBUG] Found message_id to edit: {msg_id}")
-                                break
+                    for m in last_msgs:
+                        if str(m.get("source_channel_id")) == str(selected_channel_id) and str(m.get("source_message_id")) == str(selected_message_id):
+                            msg_id = m.get("message_id")
+                            break
                     if msg_id:
-                        print(f"[DEBUG] Calling edit_message with channel_id={selected_target_channel_id}, message_id={msg_id}")
                         ok = sender.edit_message(selected_target_channel_id, msg_id, message_to_send)
-                        print(f"[DEBUG] edit_message result: {ok}")
-                        post_result = "Edited last message." if ok else "Failed to edit message."
+                        post_result = "Edited matching message." if ok else "Failed to edit message."
                     else:
-                        print(f"[DEBUG] No message_id found to edit in channel {selected_target_channel_id}")
-                        post_result = "No message to edit in target channel."
+                        post_result = "No matching message to edit in target channel."
                 else:
-                    print(f"[DEBUG] Calling send_message with target_type={selected_target_type}")
                     ok = asyncio.run(
                         sender.send_message(message_to_send, selected_target_type)
                     )
-                    print(f"[DEBUG] send_message result: {ok}")
                     post_result = "Posted successfully." if ok else "Failed to post."
 
                     if ok:

@@ -1,14 +1,14 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, render_template_string
+from flask import Flask, request, render_template, redirect, url_for, flash
 import os
 from pathlib import Path
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from datetime import datetime
 
 from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
-from admin_config import admin_config_bp  # add this import
-from admin_manager import admin_manager_bp  # renamed import
-from admin_cache import admin_cache_bp  # add this import
+from admin_config import admin_config_bp  
+from admin_manager import admin_manager_bp
+from admin_cache import admin_cache_bp 
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
