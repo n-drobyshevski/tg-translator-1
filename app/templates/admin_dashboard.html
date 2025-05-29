@@ -4,26 +4,45 @@
     <meta charset="UTF-8" />
     <title>Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Removed FontAwesome; using inline SVGs for icons -->
-    <!-- FontAwesome -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-    />
+    <!-- Roboto font -->
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet">
+    <!-- FontAwesome, Chart.js, and noUiSlider CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
+    <style>
+      body, h1, h2, h3, h4, h5, h6, button, input, textarea {
+        font-family: 'Roboto', Arial, sans-serif;
+      }
+      .chartjs-tooltip-heatmap {
+        pointer-events: none;
+        position: absolute;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+        padding: 10px 14px;
+        color: #1f2937;
+        font-size: 13px;
+        min-width: 120px;
+        max-width: 180px;
+        z-index: 1000;
+        border: 1px solid #e5e7eb;
+        transition: opacity 0.15s;
+        line-height: 1.32;
+        white-space: nowrap;
+      }
+      .chartjs-tooltip-heatmap strong { font-weight: bold; }
+      .chartjs-tooltip-heatmap ul { margin: 0; padding: 0 0 0 8px; list-style: none; }
+      .chartjs-tooltip-heatmap li { margin: 0 0 2px 0; font-size: 13px; }
+      .chartjs-tooltip-heatmap .fail { color: #ef4444; }
+      .chartjs-tooltip-heatmap .success { color: #10b981; }
+    </style>
   </head>
   <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto mt-8">
       <div class="flex items-center mb-6 justify-between">
         <h1 class="text-3xl font-bold">Admin Dashboard</h1>
         <form action="{{ url_for('logout') }}" method="get" class="m-0">
-          <button
-            type="submit"
-            class="px-4 py-2 text-red-600 rounded hover:bg-red-50 transition flex items-center"
-          >
-            Logout
-          </button>
+          <button type="submit" class="px-4 py-2 text-red-600 rounded hover:bg-red-50 transition flex items-center">Logout</button>
         </form>
       </div>
       <hr class="mb-6" />
@@ -33,121 +52,90 @@
         <!-- Left column: Charts -->
         <div class="w-full lg:w-2/3 flex flex-col gap-6">
           <!-- Main chart: Posts by channel -->
-          <div
-            class="bg-white rounded-xl shadow p-4 flex flex-col h-80 justify-between"
-          >
-            <h2 class="font-semibold mb-2">Posts by channel — last 10 days</h2>
-            <canvas
-              id="chartPosts10dChannels"
-              class="w-full flex-1"
-              style="height: 180px; min-height: 0"
-            ></canvas>
+          <div class="bg-white rounded-xl shadow p-4 flex flex-row h-80 w-full items-stretch">
+            <!-- Chart (left) -->
+            <div class="flex-1 flex flex-col justify-between mb-8">
+              <h2 class="font-semibold mb-2">Posts per Channel</h2>
+              <canvas id="chartPosts10dChannels" class="w-full h-40"></canvas>
+            </div>
+            <!-- Vertical noUiSlider (right) -->
+            <div class="flex flex-col items-center justify-center min-w-[80px]  mb-[-8rem] ml-[-2rem] pl-4 gap-2">
+              <div class="font-semibold text-sm rotate-90 origin-bottom whitespace-nowrap select-none mb-[-6.5rem] ml-[36px]">
+                Time Range
+              </div>
+              <div id="vertical-slider" style="height: 170px; margin: 0 auto;"></div>
+              <div class="flex flex-col items-center justify-center mt-2">
+                <span id="timeRangeValue" class="font-mono text-blue-700 text-lg">10</span>
+                <span class="text-xs text-gray-500 leading-none">days</span>
+              </div>
+            </div>
           </div>
 
           <!-- Secondary charts row -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 h-64">
             <!-- Posts last 10 days chart -->
             <div class="bg-white rounded-xl shadow p-4">
-              <h2 class="font-semibold mb-2">Posts — last 10 days</h2>
+              <h2 class="font-semibold mb-2">Daily Post Volume</h2>
               <canvas id="chartPosts10d" class="w-full h-64"></canvas>
             </div>
             <!-- Heatmap chart -->
             <div class="bg-white rounded-xl shadow p-4">
-              <h2 class="font-semibold mb-2">
-                Heatmap — posts by hour &amp; weekday
-              </h2>
+              <h2 class="font-semibold mb-2">Posting Activity by Hour & Day</h2>
               <canvas id="heatmapChart" class="w-full h-64"></canvas>
             </div>
           </div>
         </div>
 
         <!-- Right column: KPI Cards and Quick Links -->
-        <div class="w-full lg:w-1/3 grid grid-cols-2 gap-4">
+        <div class="w-full lg:w-1/3 grid grid-cols-2 gap-4 mt-6 lg:mt-0">
           <!-- KPI Cards Container -->
           <div class="col-span-2">
             <div class="grid grid-cols-2 gap-4 h-80">
-              <div
-                class="bg-white rounded-lg shadow p-4 flex flex-col items-center"
-              >
-                <div class="text-2xl font-bold text-blue-700 mb-1">
-                  {{ stats.total_posts }}
-                </div>
+              <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center">
+                <div class="text-2xl font-bold text-blue-700 mb-1">{{ stats.total_posts }}</div>
                 <div class="text-gray-500 text-sm">Total posts</div>
               </div>
-              <div
-                class="bg-white rounded-lg shadow p-4 flex flex-col items-center"
-              >
-                <div class="text-2xl font-bold text-green-700 mb-1">
-                  {{ stats.success_rate }}%
-                </div>
+              <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center">
+                <div class="text-2xl font-bold text-green-700 mb-1">{{ stats.success_rate }}%</div>
                 <div class="text-gray-500 text-sm">Success rate</div>
               </div>
-              <div
-                class="bg-white rounded-lg shadow p-4 flex flex-col items-center"
-              >
-                <div class="text-2xl font-bold text-cyan-700 mb-1">
-                  {{ stats.avg_latency }}
-                </div>
+              <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center">
+                <div class="text-2xl font-bold text-cyan-700 mb-1">{{ stats.avg_latency }}</div>
                 <div class="text-gray-500 text-sm">Avg latency (s)</div>
               </div>
-              <div
-                class="bg-white rounded-lg shadow p-4 flex flex-col items-center"
-              >
-                <div class="text-lg font-bold text-gray-700 mb-1">
-                  {{ stats.latest_timestamp | datetimeformat }}
-                </div>
+              <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center">
+                <div class="text-lg font-bold text-gray-700 mb-1">{{ stats.latest_timestamp | datetimeformat }}</div>
                 <div class="text-gray-500 text-sm">Latest timestamp</div>
               </div>
-              <div
-                class="bg-white rounded-lg shadow p-4 flex flex-col items-center col-span-2"
-              >
-                <div class="text-lg font-bold text-indigo-700 mb-1">
-                  {{ stats.busiest_pair }}
-                </div>
-                <div class="text-gray-500 text-sm">
-                  Busiest channel ({{ stats.busiest_pair_percent }}%)
-                </div>
+              <div class="bg-white rounded-lg shadow p-4 flex flex-col items-center col-span-2">
+                <div class="text-lg font-bold text-indigo-700 mb-1">{{ stats.busiest_pair }}</div>
+                <div class="text-gray-500 text-sm">Busiest channel ({{ stats.busiest_pair_percent }}%)</div>
               </div>
             </div>
           </div>
-
-          <div
-            class="col-span-2 bg-white rounded-lg shadow p-4 flex flex-col justify-between h-64"
-          >
+          <div class="col-span-2 bg-white rounded-lg shadow p-4 flex flex-col justify-between h-64 mt-4">
             <h3 class="font-semibold mb-3">Quick Links</h3>
             <ul class="space-y-2 flex-1 flex flex-col justify-center">
               <li>
-                <a
-                  href="/admin/config"
-                  class="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                >
+                <a href="/admin/config" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
                   <i class="fas fa-cog mr-2"></i>
                   Configuration
                 </a>
               </li>
               <li>
-                <a
-                  href="/admin/manager"
-                  class="flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
-                >
+                <a href="/admin/manager" class="flex items-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">
                   <i class="fas fa-clipboard-list mr-2"></i>
                   Message Manager
                 </a>
               </li>
               <li>
-                <a
-                  href="/admin/cache"
-                  class="flex items-center px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition"
-                >
+                <a href="/admin/cache" class="flex items-center px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition">
                   <i class="fas fa-database mr-2"></i>
                   Channel Cache
                 </a>
               </li>
               <li>
-                <a
-                  href="/admin/stats"
-                  class="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-                >
+                <a href="/admin/stats" class="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
                   <i class="fas fa-chart-bar mr-2"></i>
                   View Stats
                 </a>
@@ -158,9 +146,37 @@
       </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts: Chart.js, Chartjs Matrix, dashboard, noUiSlider -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.2.0/dist/chartjs-chart-matrix.min.js"></script>
     <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var slider = document.getElementById('vertical-slider');
+      if (!slider) return;
+      noUiSlider.create(slider, {
+          start: 10,
+          orientation: 'vertical',
+          direction: 'rtl', // low = bottom, high = top
+          range: { 'min': 3, 'max': 30 },
+          step: 1,
+          connect: [true, false],
+          tooltips: false,
+          format: {
+              to: value => Math.round(value),
+              from: value => Number(value)
+          }
+      });
+      // Update value display and trigger chart update if needed
+      slider.noUiSlider.on('update', function(values, handle) {
+          document.getElementById('timeRangeValue').innerText = values[handle];
+          // Call your chart update function here if needed!
+          if (typeof loadPostsPerChannelChart === "function") {
+              loadPostsPerChannelChart(Number(values[handle]));
+          }
+      });
+    });
+    </script>
   </body>
 </html>

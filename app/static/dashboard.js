@@ -6,29 +6,44 @@ let heatmapChart = null;
 
 /* Build (or update) the chart */
 function drawPosts10d({ labels, counts }) {
-  const ctx = document.getElementById('chartPosts10d');
+  const ctx = document.getElementById("chartPosts10d");
   if (!ctx) {
-    console.warn('#chartPosts10d canvas not found');
+    console.warn("#chartPosts10d canvas not found");
     return;
   }
   if (!posts10dChart) {
     posts10dChart = new Chart(ctx, {
-      type: 'line',
+      type: "line",
       data: {
         labels,
-        datasets: [{
-          label: 'Posts per day',
-          data: counts,
-          fill: false,
-          tension: 0.3
-        }]
+        datasets: [
+          {
+            label: "Posts per day",
+            data: counts,
+            fill: false,
+            tension: 0.3,
+          },
+        ],
       },
       options: {
         scales: {
-          y: { beginAtZero: true, ticks: { precision: 0 } }
+          y: { beginAtZero: true, ticks: { precision: 0 } },
+          x: {
+            ticks: {
+              font: {
+                size: 10, // 👈 Make date labels smaller!
+              },
+            },
+          },
         },
-        plugins: { legend: { display: false } }
-      }
+        plugins: {
+          tooltip: {
+            enabled: false, // <<< KEY PART
+            external: customTooltip, // <<< KEY PART
+          },
+          legend: { display: false },
+        },
+      },
     });
   } else {
     posts10dChart.data.labels = labels;
@@ -54,27 +69,43 @@ function drawPosts10dChannels({ labels, series }) {
         borderColor: getColor(i),
         backgroundColor: getColor(i),
         fill: false,
-        tension: 0 // <--- not smooth line
-      }))
+        tension: 0, // <--- not smooth line
+      })),
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      devicePixelRatio: 2,
+
       scales: {
         y: { beginAtZero: true, ticks: { precision: 0 } },
+        x: {
+          ticks: {
+            font: {
+              size: 10, // 👈 Make date labels smaller!
+            },
+          },
+        },
       },
-      plugins: { legend: { position: 'top' } },
+      plugins: {
+        tooltip: {
+          enabled: false, // <<< KEY PART
+          external: customTooltip, // <<< KEY PART
+        },
+        legend: { position: "top" },
+      },
     },
   });
 }
-  
+
 /* Build (or update) heatmap */
 function drawHeatmap(matrix) {
-console.log("HEATMAP:", matrix);
+  console.log("HEATMAP:", matrix);
   if (!matrix) return;
   const { data, xLabels, yLabels, max } = matrix;
-  const ctx = document.getElementById('heatmapChart');
+  const ctx = document.getElementById("heatmapChart");
   if (!ctx) {
-    console.warn('#heatmapChart canvas not found');
+    console.warn("#heatmapChart canvas not found");
     return;
   }
   // destroy old chart if present
@@ -82,75 +113,198 @@ console.log("HEATMAP:", matrix);
     heatmapChart.destroy();
   }
   heatmapChart = new Chart(ctx, {
-    type: 'matrix',
+    type: "matrix",
     data: {
-      datasets: [{
-        data: data,
-        backgroundColor: (chartCtx) => {
-          const item = chartCtx.dataset.data[chartCtx.dataIndex];
-          const alpha = max ? (item.v / max) : 0;
-          return `rgba(59,130,246,${alpha})`;
-        }
-      }]
+      datasets: [
+        {
+          data: data,
+          backgroundColor: (chartCtx) => {
+            const item = chartCtx.dataset.data[chartCtx.dataIndex];
+            const alpha = max ? item.v / max : 0;
+            return `rgba(59,130,246,${alpha})`;
+          },
+        },
+      ],
     },
     options: {
       scales: {
-        x: { type: 'category', labels: xLabels },
-        y: { type: 'category', labels: yLabels, reverse: true }
+        x: { type: "category", labels: xLabels },
+        y: { type: "category", labels: yLabels, reverse: true },
       },
       elements: { rectangle: { borderWidth: 1 } },
       plugins: {
         tooltip: {
-          callbacks: {
-            title: () => '',
-            label: ctx => {
-              const item = ctx.dataset.data[ctx.dataIndex];
-              return `${ctx.parsed.y}, ${ctx.parsed.x}: ${item.v} posts`;
-            }
-          }
+          enabled: false, // <<< KEY PART
+          external: customTooltipHeatmap, // <<< KEY PART
         },
-        legend: { display: false }
+        legend: { display: false },
       },
       animation: false,
-    }
+    },
   });
 }
 
 function getColor(i) {
-  const palette = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6'];
+  const palette = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#14b8a6",
+  ];
   return palette[i % palette.length];
 }
 
 /* Fetch summary JSON and feed the charts */
 async function loadMetrics() {
   try {
-    const res = await fetch('/api/metrics/summary');
+    const res = await fetch("/api/metrics/summary");
     if (!res.ok) throw new Error(res.statusText);
     const json = await res.json();
-    console.log(json); 
+    console.log(json);
     if (json.posts_10d) drawPosts10d(json.posts_10d);
     if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
     if (json.posts_matrix) {
       drawHeatmap(json.posts_matrix);
     } else {
-      console.warn('No posts_matrix data in summary');
+      console.warn("No posts_matrix data in summary");
     }
   } catch (err) {
-    console.error('Metrics fetch failed:', err);
+    console.error("Metrics fetch failed:", err);
   }
 }
 
 /* Wait until DOM ready and Chart.js present */
 function ready(fn) {
-  if (document.readyState !== 'loading') fn();
-  else document.addEventListener('DOMContentLoaded', fn);
+  if (document.readyState !== "loading") fn();
+  else document.addEventListener("DOMContentLoaded", fn);
 }
 
 ready(() => {
-  if (typeof Chart === 'undefined') {
-    console.error('Chart.js not loaded – check CDN tag order.');
+  if (typeof Chart === "undefined") {
+    console.error("Chart.js not loaded – check CDN tag order.");
     return;
   }
   loadMetrics();
-//   setInterval(loadMetrics, 30_000); // refresh every 30 s
+  //   setInterval(loadMetrics, 30_000); // refresh every 30 s
 });
+
+function customTooltipHeatmap(context) {
+    let tooltipEl = document.getElementById("chartjs-universal-tooltip");
+    if (!tooltipEl) {
+      tooltipEl = document.createElement("div");
+      tooltipEl.id = "chartjs-universal-tooltip";
+      tooltipEl.className = "chartjs-tooltip-heatmap";
+      document.body.appendChild(tooltipEl);
+    }
+  
+    const tooltip = context.tooltip;
+    if (!tooltip || tooltip.opacity === 0) {
+      tooltipEl.style.opacity = 0;
+      return;
+    }
+  
+    let content = "";
+    if (tooltip.dataPoints && tooltip.dataPoints.length > 0) {
+      const dp = tooltip.dataPoints[0];
+      if (context.chart.config.type === "matrix") {
+        // Use numeric y as weekday index
+        const weekDays = [
+          "Sunday", "Monday", "Tuesday", "Wednesday",
+          "Thursday", "Friday", "Saturday"
+        ];
+        const pad = n => n.toString().padStart(2, "0");
+        let { x, y } = dp.parsed;
+        const item = dp.dataset.data[dp.dataIndex];
+        // y is index: 0=Sunday ... 6=Saturday
+        const yIndex = typeof y === "number" ? y : parseInt(y, 10);
+        const weekday = weekDays[yIndex +1] || yIndex;
+        const hourLabel = `${pad(x)}:00`;
+  
+        content += `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+            <b style="margin-right:4px">${weekday} </b> <b>${hourLabel}</b>
+          </div>
+          <div style="border-top:1px solid #e5e7eb; margin:8px 0;"></div>
+          <div style="font-weight:700; font-size:15px;">
+            ${item.v} posts
+          </div>
+        `;
+      }
+    }
+  
+    const { offsetLeft: posX, offsetTop: posY } = tooltip.chart.canvas;
+    tooltipEl.innerHTML = content;
+    tooltipEl.style.opacity = 1;
+    tooltipEl.style.left = `${posX + tooltip.caretX + 14}px`;
+    tooltipEl.style.top = `${posY + tooltip.caretY + 14}px`;
+  }
+  
+
+function customTooltip(context) {
+  let tooltipEl = document.getElementById("chartjs-minimal-tooltip");
+  if (!tooltipEl) {
+    tooltipEl = document.createElement("div");
+    tooltipEl.id = "chartjs-minimal-tooltip";
+    tooltipEl.className = "chartjs-tooltip-heatmap"; // Reuse the small CSS!
+    document.body.appendChild(tooltipEl);
+  }
+
+  const tooltip = context.tooltip;
+  if (!tooltip || tooltip.opacity === 0) {
+    tooltipEl.style.opacity = 0;
+    return;
+  }
+
+  let content = "";
+  if (tooltip.dataPoints && tooltip.dataPoints.length > 0) {
+    const dp = tooltip.dataPoints[0];
+    // Label: day, channel, etc. Value: count
+    // Try to support both line and bar configs
+    let label = dp.label || dp.parsed.x || dp.parsed.y;
+    let value = dp.formattedValue || (dp.raw && dp.raw.v) || dp.raw || "";
+    // Remove any HTML from label just in case
+    label = String(label).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    content += `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b>${label}</b> <b>${value}</b>
+      </div>
+    `;
+  }
+
+  const { offsetLeft: posX, offsetTop: posY } = tooltip.chart.canvas;
+  tooltipEl.innerHTML = content;
+  tooltipEl.style.opacity = 1;
+  tooltipEl.style.left = `${posX + tooltip.caretX + 14}px`;
+  tooltipEl.style.top = `${posY + tooltip.caretY + 14}px`;
+}
+
+
+// SLIDER ________________________
+document.addEventListener("DOMContentLoaded", () => {
+  const slider = document.getElementById("timeRangeDays");
+  const valueSpan = document.getElementById("timeRangeValue");
+
+  // Set initial value
+  valueSpan.textContent = slider.value;
+
+  slider.addEventListener("input", () => {
+    valueSpan.textContent = slider.value;
+    loadPostsPerChannelChart(parseInt(slider.value, 10));
+  });
+
+  // Initial load
+  loadPostsPerChannelChart(parseInt(slider.value, 10));
+});
+async function loadPostsPerChannelChart(days) {
+  try {
+    const res = await fetch(`/api/metrics/summary?days=${days}`);
+    if (!res.ok) throw new Error(res.statusText);
+    const json = await res.json();
+    if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
+  } catch (err) {
+    console.error("Posts per Channel fetch failed:", err);
+  }
+}

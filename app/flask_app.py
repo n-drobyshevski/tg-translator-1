@@ -74,18 +74,21 @@ bp = Blueprint("metrics", __name__, url_prefix="/api")
 
 @bp.route("/metrics/summary")
 def metrics_summary():
-    """Return 10-day post counts and other light KPIs."""
+    """Return post counts and KPIs with a flexible time window."""
     try:
         messages = load_messages()
+        # Get the days parameter, default to 10 if not provided
+        days = int(request.args.get("days", 10))
         payload = {
-            "posts_10d": build_summary(messages),
-            "posts_10d_channels": build_10d_channels(messages),
+            "posts_10d": build_summary(messages, days),
+            "posts_10d_channels": build_10d_channels(messages, days),
             "posts_matrix": build_hourly_matrix(messages),
         }
     except Exception as exc:
         current_app.logger.exception("summary route failed")
         return jsonify(error=str(exc)), 500
     return jsonify(payload)
+
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(admin_prompt_bp)

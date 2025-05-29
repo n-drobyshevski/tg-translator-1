@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <title>Channel Message Translation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -37,7 +38,7 @@
     </style>
   </head>
   <body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
-    <div class="container mx-auto mt-8">
+    <div class="container mx-auto mt-8 px-2 sm:px-4">
       <div class="flex items-center mb-6">
         {% set href = '/admin' %}
         {% include 'components/back_button.html' %}
@@ -357,7 +358,6 @@
                  popup.className = "fixed top-4 right-4 bg-green-200 text-green-800 p-4 rounded shadow-lg z-50";
              }
              document.body.appendChild(popup);
-             setTimeout(() => { popup.remove(); }, 3000);
              const box = document.getElementById('postResultBox');
              if(box) box.scrollIntoView({behavior: "smooth", block: "center"});
           }
