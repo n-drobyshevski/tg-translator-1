@@ -10,6 +10,10 @@ from admin_config import admin_config_bp
 from admin_manager import admin_manager_bp
 from admin_cache import admin_cache_bp
 from admin_stats import admin_stats_bp
+from aggregator import build_summary, build_10d_channels, build_hourly_matrix
+from aggregator import load_messages, build_summary, build_hourly_matrix
+
+# use absolute import
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -53,7 +57,7 @@ def login():
         else:
             flash("Wrong password, try again!", "error")
     return render_template("login.html")
-   
+
 # --- Logout Route ---
 @app.route("/logout")
 @login_required
@@ -62,12 +66,34 @@ def logout():
     flash("Logged out 👋", "info")
     return redirect(url_for("login"))
 
+# --- Metrics API Blueprint ---
+from flask import Blueprint, jsonify, current_app
+
+bp = Blueprint("metrics", __name__, url_prefix="/api")
+
+
+@bp.route("/metrics/summary")
+def metrics_summary():
+    """Return 10-day post counts and other light KPIs."""
+    try:
+        messages = load_messages()
+        payload = {
+            "posts_10d": build_summary(messages),
+            "posts_10d_channels": build_10d_channels(messages),
+            "posts_matrix": build_hourly_matrix(messages),
+        }
+    except Exception as exc:
+        current_app.logger.exception("summary route failed")
+        return jsonify(error=str(exc)), 500
+    return jsonify(payload)
+
 app.register_blueprint(admin_bp)
 app.register_blueprint(admin_prompt_bp)
 app.register_blueprint(admin_config_bp)  # add this
 app.register_blueprint(admin_manager_bp)  # renamed blueprint
 app.register_blueprint(admin_cache_bp)  # register cache blueprint
 app.register_blueprint(admin_stats_bp)  # register stats blueprint
+app.register_blueprint(bp)
 
 TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 
@@ -76,16 +102,19 @@ TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
 def home_page():
     return render_template("home.html")
 
-def datetimeformat(value, format='%M-%H %d-%m-%Y'):
+# Override datetimeformat to handle ISO strings
+@app.template_filter("datetimeformat")
+def datetimeformat_iso(value, fmt="%H:%M %d/%m/%y"):
     try:
-        if isinstance(value, datetime):
-            return value.strftime(format)
-        ts = float(value)
-        return datetime.fromtimestamp(ts).strftime(format)
+        if isinstance(value, str):
+            dt = datetime.fromisoformat(value.replace("Z",""))
+        elif isinstance(value, (int, float)):
+            dt = datetime.fromtimestamp(value)
+        else:
+            return value
+        return dt.strftime(fmt)
     except Exception:
         return value
-
-app.jinja_env.filters['datetimeformat'] = datetimeformat
 
 @app.errorhandler(404)
 def page_not_found(e):

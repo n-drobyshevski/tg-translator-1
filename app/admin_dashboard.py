@@ -1,10 +1,54 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, redirect, url_for
 import os
+import sys
+# ensure translator package is importable
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from flask_login import login_required
+import logging
+from translator.stats_logger import STATS_PATH
 
 admin_bp = Blueprint("admin_bp", __name__)
 
-@admin_bp.route("/admin", methods=["GET"])
+def compute_stats(messages):
+    # count only actual post attempts (success or failure)
+    total_posts = sum(1 for m in messages if m.get("posting_success") is not None)
+    success_count = sum(1 for m in messages if m.get("posting_success") is True)
+    fail_count = total_posts - success_count
+    success_rate = round(100 * success_count / total_posts, 1) if total_posts > 0 else 0
+    # Avg latency
+    latencies = [m.get("translation_time", 0) for m in messages if m.get("translation_time") is not None]
+    avg_latency = round(sum(latencies) / len(latencies), 2) if latencies else 0
+    # Latest timestamp
+    latest = max((m.get("timestamp") for m in messages if m.get("timestamp")), default="-")
+    # Busiest channel pair
+    from collections import Counter
+    pairs = [
+        f'{m.get("source_channel_name","") or m.get("source_channel","")}'
+
+        f' → '
+
+        f'{m.get("dest_channel_name","") or m.get("dest_channel","")}'
+
+        for m in messages
+    ]
+    if pairs:
+        busiest, count = Counter(pairs).most_common(1)[0]
+        busiest_percent = round(100 * count / total_posts)
+    else:
+        busiest, busiest_percent = "-", 0
+    return {
+        "total_posts": total_posts,
+        "successful_posts": success_count,
+        "failed_posts":     fail_count,
+        "success_rate":    success_rate,
+        "avg_latency":     avg_latency,
+        "latest_timestamp": latest,
+        "busiest_pair":    busiest,
+        "busiest_pair_percent": busiest_percent,
+    }
+
+
+@admin_bp.route("/admin", methods=["GET"], strict_slashes=False)
 @login_required
 def admin_dashboard():
     # Show only summary info and links
@@ -14,4 +58,23 @@ def admin_dashboard():
         "CHRISTIANVISION_CHANNEL": os.getenv("CHRISTIANVISION_CHANNEL", ""),
         "SHALTNOTKILL_CHANNEL": os.getenv("SHALTNOTKILL_CHANNEL", ""),
     }
-    return render_template("admin_dashboard.html", info=info)
+    try:
+        import json
+        with open(STATS_PATH, "r", encoding="utf-8") as f:
+            stats_json = json.load(f)
+        messages = stats_json.get("messages", [])
+        stats = compute_stats(messages)
+    except (FileNotFoundError, json.JSONDecodeError):
+        logging.exception("Failed to compute stats, using default values.")
+        stats = {
+            "total_posts": 0,
+            "successful_posts": 0,
+            "failed_posts": 0,
+            "success_rate": 0,
+            "avg_latency": 0,
+            "latest_timestamp": "-",
+            "busiest_pair": "-",
+            "busiest_pair_percent": 0,
+        }
+        
+    return render_template("admin_dashboard.html", info=info, stats=stats)

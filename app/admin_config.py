@@ -144,4 +144,6 @@ def admin_dashboard():
         "CHRISTIANVISION_CHANNEL": os.getenv("CHRISTIANVISION_CHANNEL", ""),
         "SHALTNOTKILL_CHANNEL": os.getenv("SHALTNOTKILL_CHANNEL", ""),
     }
-    return render_template("admin_dashboard.html", info=info)
+    # Provide a dummy stats object to avoid Jinja errors if not present
+    stats = {"total_messages": 0, "successful_posts": 0, "failed_posts": 0}
+    return render_template("admin_dashboard.html", info=info, stats=stats)
