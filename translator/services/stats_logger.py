@@ -2,15 +2,9 @@ import os
 import json
 from datetime import datetime, timezone
 
-try:
-    from .channel_logger import CACHE_DIR
-except ImportError:
-    from translator.services.channel_logger import CACHE_DIR
+from translator.config import STATS_PATH, DEFAULT_STATS
 
 from translator.models import MessageEvent
-
-STATS_PATH = os.path.join(CACHE_DIR, "stats.json")
-DEFAULT_STATS = {"messages": []}
 
 def _load_stats() -> dict:
     try:
@@ -20,7 +14,7 @@ def _load_stats() -> dict:
         return DEFAULT_STATS.copy()
 
 def _save_stats(stats: dict) -> None:
-    os.makedirs(CACHE_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(STATS_PATH), exist_ok=True)
     with open(STATS_PATH, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
 

@@ -86,3 +86,10 @@ class Config:
 
 
 CONFIG = Config()
+
+# Directory for channel/message cache and stats
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
+STATS_PATH = os.path.join(CACHE_DIR, "stats.json")
+STORE_PATH = os.path.join(CACHE_DIR, "channel_cache.json")
+DEFAULT_STATS = {"messages": []}
+MESSAGES_LIMIT = 9

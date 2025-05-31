@@ -3,11 +3,9 @@ import json
 import os
 from typing import List, Dict, Any, Optional
 from pyrogram.errors import MessageIdInvalid
+from translator.config import CACHE_DIR, STORE_PATH, MESSAGES_LIMIT
 
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
-STORE_PATH = os.path.join(CACHE_DIR, "channel_cache.json")
-MESSAGES_LIMIT = 9
 
 
 class ChannelCache:
@@ -81,3 +79,8 @@ def store_message(channel_id, message_data):
 
 def get_last_messages(channel_id):
     return channel_cache.get_last_messages(channel_id)
+
+
+# add this so admin_manager can import it
+def check_deleted_messages(client):
+    channel_cache.check_deleted_messages(client)

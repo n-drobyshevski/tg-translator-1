@@ -281,11 +281,31 @@ function customTooltip(context) {
   tooltipEl.style.top = `${posY + tooltip.caretY + 14}px`;
 }
 
-
 // SLIDER ________________________
 document.addEventListener("DOMContentLoaded", () => {
   const slider = document.getElementById("timeRangeDays");
   const valueSpan = document.getElementById("timeRangeValue");
+
+  if (!slider || !valueSpan) {
+    // If either element is missing, do not proceed
+    if (!slider) {
+      console.warn(
+        "Slider element with id 'timeRangeDays' not found in DOM. The slider functionality will not work. " +
+        "Ensure an element with id='timeRangeDays' exists in your HTML."
+      );
+    }
+    if (!valueSpan) {
+      console.warn(
+        "Value span element with id 'timeRangeValue' not found in DOM. The slider value display will not work. " +
+        "Ensure an element with id='timeRangeValue' exists in your HTML."
+      );
+    }
+    console.warn(
+      "Slider or value span not found in DOM.",
+      { slider: !!slider, valueSpan: !!valueSpan }
+    );
+    return;
+  }
 
   // Set initial value
   valueSpan.textContent = slider.value;

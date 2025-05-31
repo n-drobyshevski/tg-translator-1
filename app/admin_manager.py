@@ -5,14 +5,10 @@ import asyncio
 from pathlib import Path
 from flask_login import login_required  
 import bleach
-try:
-    from translator.services.channel_logger import get_last_messages, check_deleted_messages, store_message
-except ImportError:
-    from channel_logger import get_last_messages, check_deleted_messages, store_message
-import datetime                                                                                 # add datetime
-
+import datetime  # add datetime
 from anthropic import Anthropic
-from translator.services.channel_logger import get_last_messages, check_deleted_messages
+from translator.services.channel_logger import get_last_messages, check_deleted_messages, store_message
+from translator.config import CACHE_DIR
 from translator import bot  # Import for translation functions
 
 admin_manager_bp = Blueprint("admin_manager_bp", __name__)  # renamed blueprint
@@ -156,7 +152,6 @@ def channel_translate():
                     filtered_msgs = [msg for msg in last_msgs if str(msg.get("message_id")) != str(selected_message_id)]
                     # Update the cache file
                     try:
-                        from translator.services.channel_logger import CACHE_DIR
                         import json
                         cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
                         # Load full cache, update, and save

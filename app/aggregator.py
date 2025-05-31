@@ -14,10 +14,7 @@ from datetime import timedelta, date, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 import logging
-
-# Path to the JSON‑Lines or JSON stats file written by stats_logger.
-# Update this if your stats logger writes somewhere else.
-STATS_PATH = Path(__file__).resolve().parent.parent / "translator/cache" / "stats.json"
+from translator.config import STATS_PATH
 
 logger = logging.getLogger(__name__)
 

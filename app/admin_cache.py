@@ -3,6 +3,7 @@ import json
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required
 from datetime import datetime, timezone
+from translator.config import CACHE_DIR
 
 admin_cache_bp = Blueprint("admin_cache_bp", __name__)
 
@@ -63,10 +64,6 @@ def datetimeformat(value, format='%H:%M %d/%m/%Y'):
 @admin_cache_bp.route("/admin/cache", methods=["GET"])
 @login_required
 def show_cache():
-    try:
-        from translator.services.channel_logger import CACHE_DIR
-    except ImportError:
-        from channel_logger import CACHE_DIR
     cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
     cache_data = {}
     error = None
