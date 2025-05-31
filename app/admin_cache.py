@@ -64,7 +64,7 @@ def datetimeformat(value, format='%H:%M %d/%m/%Y'):
 @login_required
 def show_cache():
     try:
-        from translator.channel_logger import CACHE_DIR
+        from translator.services.channel_logger import CACHE_DIR
     except ImportError:
         from channel_logger import CACHE_DIR
     cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
@@ -108,7 +108,7 @@ def update_cache():
     Update the cache for a given channel and message using channel_logger.store_message.
     Expects JSON payload: { "channel_id": ..., "message": {...} }
     """
-    from translator.channel_logger import store_message
+    from translator.services.channel_logger import store_message
 
     data = request.get_json(silent=True)
     if not data or "channel_id" not in data or "message" not in data:

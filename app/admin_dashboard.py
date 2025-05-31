@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from flask_login import login_required
 import logging
-from translator.stats_logger import STATS_PATH
+from translator.services.stats_logger import STATS_PATH
 
 admin_bp = Blueprint("admin_bp", __name__)
 

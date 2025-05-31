@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify
 from flask_login import login_required
 import os, json
-from translator.stats_logger import STATS_PATH, DEFAULT_STATS
+from translator.services.stats_logger import STATS_PATH, DEFAULT_STATS
 
 admin_stats_bp = Blueprint("admin_stats_bp", __name__)
 

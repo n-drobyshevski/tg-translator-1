@@ -6,14 +6,14 @@ from pathlib import Path
 from flask_login import login_required  
 import bleach
 try:
-    from translator.channel_logger import get_last_messages, check_deleted_messages, store_message
+    from translator.services.channel_logger import get_last_messages, check_deleted_messages, store_message
 except ImportError:
     from channel_logger import get_last_messages, check_deleted_messages, store_message
 import datetime                                                                                 # add datetime
 
 from anthropic import Anthropic
-from translator.channel_logger import get_last_messages, check_deleted_messages
-from translator import translator_reg  # Import for translation functions
+from translator.services.channel_logger import get_last_messages, check_deleted_messages
+from translator import bot  # Import for translation functions
 
 admin_manager_bp = Blueprint("admin_manager_bp", __name__)  # renamed blueprint
 TEMPLATE_PATH = Path(__file__).parent.parent / "translator" / "prompt_template.txt"
@@ -156,7 +156,7 @@ def channel_translate():
                     filtered_msgs = [msg for msg in last_msgs if str(msg.get("message_id")) != str(selected_message_id)]
                     # Update the cache file
                     try:
-                        from translator.channel_logger import CACHE_DIR
+                        from translator.services.channel_logger import CACHE_DIR
                         import json
                         cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
                         # Load full cache, update, and save
@@ -231,7 +231,7 @@ def channel_translate():
             try:
                 print(f"[ADMIN] Translating message {selected_message_id} from channel {selected_channel_id}")
                 # --- Use build_prompt and translate_html from translator_reg ---
-                from translator.translator_reg import translate_html
+                from translator.bot import translate_html
 
                 # Avoid HTML in payload, use plain text for source channel info
                 if chat_username:
@@ -283,7 +283,7 @@ def channel_translate():
     if action == "post":
         print("Posting translation result to target channel")
         try:
-            from translator.telegram_sender import TelegramSender
+            from translator.services.telegram_sender import TelegramSender
             sender = TelegramSender()
             if not selected_target_type:
                 post_result = "Error posting: Target channel not found."

@@ -126,7 +126,6 @@
       "api_error_code": null,
       "exception_message": null
     },
-
     {
       "timestamp": "2025-05-13T14:47:12.654321+00:00",
       "event": "create",
@@ -210,6 +209,42 @@
       "posting_success": true,
       "api_error_code": null,
       "exception_message": null
+    },
+    {
+      "timestamp": "2025-05-30T22:16:49.975967+00:00",
+      "event": "create",
+      "edit_timestamp": null,
+      "source_channel": "-1002657093374",
+      "source_channel_name": "test_source",
+      "dest_channel": "-1002674864764",
+      "dest_channel_name": "test",
+      "message_id": "281",
+      "media_type": "text",
+      "file_size_bytes": null,
+      "original_size": 1177,
+      "previous_size": null,
+      "new_size": null,
+      "translated_size": 1459,
+      "translation_time": 3.470350099989446,
+      "retry_count": 0,
+      "posting_success": true,
+      "api_error_code": null,
+      "exception_message": null
+    },
+    {
+      "timestamp": "2025-05-31T12:08:33.777116+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "288",
+      "media_type": "text",
+      "original_size": 1177,
+      "translated_size": 1459,
+      "translation_time": 3.715957200009143,
+      "retry_count": 0,
+      "posting_success": true
     }
   ]
 }

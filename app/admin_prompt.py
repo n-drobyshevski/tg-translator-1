@@ -16,7 +16,7 @@ from flask_login import login_required  # add this import
 # Add the parent directory of the bot package to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import translator.translator_reg  # Import the translate_message function
+import translator.bot  # Import the translate_message function
 from anthropic import Anthropic
 
 admin_prompt_bp = Blueprint("admin_prompt_bp", __name__)
@@ -118,7 +118,7 @@ def test_translation():
             import asyncio
 
             translation_result = asyncio.run(
-                translator.translator_reg.translate_html(anthropic_client, msg)
+                translator.bot.translate_html(anthropic_client, msg)
             )
         except Exception as e:
             translation_result = f"Error during translation: {e}"

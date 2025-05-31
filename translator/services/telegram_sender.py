@@ -1,24 +1,17 @@
 import logging
 import os
-from dataclasses import dataclass
 from typing import List
 
 import requests
 from dotenv import load_dotenv
+from translator.models import ChannelConfig
 
 try:
     from .channel_logger import store_message
 except ImportError:
-    from channel_logger import store_message
+    from translator.services.channel_logger import store_message
 
 load_dotenv()
-
-
-@dataclass
-class ChannelConfig:
-    channel_id: int
-    bot_token: str
-
 
 # Load all channel configs once
 CHANNEL_CONFIGS = {

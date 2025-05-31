@@ -5,7 +5,9 @@ from datetime import datetime, timezone
 try:
     from .channel_logger import CACHE_DIR
 except ImportError:
-    from channel_logger import CACHE_DIR
+    from translator.services.channel_logger import CACHE_DIR
+
+from translator.models import MessageEvent
 
 STATS_PATH = os.path.join(CACHE_DIR, "stats.json")
 DEFAULT_STATS = {"messages": []}
@@ -50,27 +52,29 @@ def record_event(
         event_val = "edit" if edit_timestamp else "create"
     else:
         event_val = event
-    stats["messages"].append({
-        "timestamp":        datetime.now(timezone.utc).isoformat(),  # when the event was recorded
-        "event":            event_val,                               # type of event ("edit" or "create")
-        "edit_timestamp":   edit_timestamp,                          # for edits: when Telegram fired the update
-        "source_channel":   source_channel,                          # original message channel id
-        "source_channel_name": source_channel_name,                  # human-readable source channel name
-        "dest_channel":     dest_channel,                            # translated message channel id
-        "dest_channel_name": dest_channel_name,                      # human-readable dest channel name
-        "message_id":       message_id,                              # unique message identifier
-        "media_type":       media_type,                              # "text" | "photo" | "video" | "doc"
-        "file_size_bytes":  file_size_bytes,                         # size of media file in bytes
-        "original_size":    original_size,                           # length of the original message
-        "previous_size":    previous_size,                           # length before edit
-        "new_size":         new_size,                                # length after edit
-        "translated_size":  translated_size,                         # length of the translated message
-        "translation_time": translation_time,                        # seconds spent translating
-        "retry_count":      retry_count,                             # number of retry attempts
-        "posting_success":  posting_success,                         # True if post succeeded
-        "api_error_code":   api_error_code,                          # HTTP status on failure
-        "exception_message": exception_message,                      # error snippet if failed
-    })
+    evt = MessageEvent(
+        timestamp        = datetime.now(timezone.utc).isoformat(),  # when the event was recorded
+        event_type       = event_val,                               # type of event ("edit" or "create")
+        edit_timestamp   = edit_timestamp,                          # for edits: when Telegram fired the update
+        source_channel   = source_channel,                          # original message channel id
+        source_channel_name = source_channel_name,                  # human-readable source channel name
+        dest_channel     = dest_channel,                            # translated message channel id
+        dest_channel_name = dest_channel_name,                      # human-readable dest channel name
+        message_id       = message_id,                              # unique message identifier
+        media_type       = media_type,                              # "text" | "photo" | "video" | "doc"
+        file_size_bytes  = file_size_bytes,                         # size of media file in bytes
+        original_size    = original_size,                           # length of the original message
+        previous_size    = previous_size,                           # length before edit
+        new_size         = new_size,                                # length after edit
+        translated_size  = translated_size,                         # length of the translated message
+        translation_time = translation_time,                        # seconds spent translating
+        retry_count      = retry_count,                             # number of retry attempts
+        posting_success  = posting_success,                         # True if post succeeded
+        api_error_code   = api_error_code,                          # HTTP status on failure
+        exception_message = exception_message                       # error snippet if failed
+    )
+    event_data = evt.to_dict()
+    stats["messages"].append(event_data)
     _save_stats(stats)
 
 def build_event_kwargs(
