@@ -8,11 +8,11 @@ import bleach
 import datetime  # add datetime
 from anthropic import Anthropic
 from translator.services.channel_logger import get_last_messages, check_deleted_messages, store_message
-from translator.config import CACHE_DIR
+from translator.config import CACHE_DIR, PROMPT_TEMPLATE_PATH
 from translator import bot  # Import for translation functions
 
 admin_manager_bp = Blueprint("admin_manager_bp", __name__)  # renamed blueprint
-TEMPLATE_PATH = Path(__file__).parent.parent / "translator" / "prompt_template.txt"
+# TEMPLATE_PATH = Path(__file__).parent.parent / "translator" / "prompt_template.txt"
 
 
 # Helper to get available channels from env

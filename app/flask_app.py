@@ -1,9 +1,16 @@
 from flask import Flask, request, render_template, redirect, url_for, flash
 import os
-from pathlib import Path
+import sys
+# make sure project root is on sys.path so 'translator' can be found
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from datetime import datetime
+from translator.config import PROMPT_TEMPLATE_PATH
 
+# --- use absolute import for your blueprints etc. ---
 from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
 from admin_config import admin_config_bp  
@@ -105,9 +112,6 @@ app.register_blueprint(admin_cache_bp)  # register cache blueprint
 app.register_blueprint(admin_stats_bp)  # register stats blueprint
 app.register_blueprint(bp)
 
-TEMPLATE_PATH = Path(__file__).parent / "../translator/prompt_template.txt"
-
-
 @app.route("/")
 def home_page():
     return render_template("home.html")
@@ -132,8 +136,7 @@ def page_not_found(e):
 
 if __name__ == "__main__":
     # Ensure the template file exists
-    if not TEMPLATE_PATH.exists():
-        raise FileNotFoundError(f"Template file not found: {TEMPLATE_PATH}")
-
+    if not PROMPT_TEMPLATE_PATH.exists():
+        raise FileNotFoundError(f"Template file not found: {PROMPT_TEMPLATE_PATH}")
     # Start the Flask application
     app.run(host="0.0.0.0", port=5000)

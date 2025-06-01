@@ -84,7 +84,7 @@ def build_event_kwargs(
     **extra_fields
 ) -> dict:
     """
-    Helper used by translator_reg.py to create the kwargs
+    Helper used by bot.py to create the kwargs
     expected by record_event().
 
     Any key left as None will be omitted from the final dict.

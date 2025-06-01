@@ -4,6 +4,7 @@ Centralized configuration with environment validation.
 
 import os
 from typing import Dict, Optional, Any
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -93,3 +94,12 @@ STATS_PATH = os.path.join(CACHE_DIR, "stats.json")
 STORE_PATH = os.path.join(CACHE_DIR, "channel_cache.json")
 DEFAULT_STATS = {"messages": []}
 MESSAGES_LIMIT = 9
+
+# Prompt template path and loader
+PROMPT_TEMPLATE_PATH = Path(__file__).parent / "prompt_template.txt"
+
+
+def load_prompt_template():
+    if PROMPT_TEMPLATE_PATH.exists():
+        return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return "{message_text}"

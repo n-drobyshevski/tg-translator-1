@@ -1,11 +1,10 @@
 import os
 from flask import Blueprint, render_template, request, session, redirect, url_for, flash
-from pathlib import Path
+from translator.config import PROMPT_TEMPLATE_PATH
 import requests
 from flask_login import login_required  # add this import
 
 admin_config_bp = Blueprint("admin_config_bp", __name__)
-TEMPLATE_PATH = Path(__file__).parent.parent / "translator" / "prompt_template.txt"
 
 @admin_config_bp.route("/admin/config", methods=["GET", "POST"])
 @login_required
@@ -14,7 +13,7 @@ def admin_config():
     current_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     current_api_key = os.getenv("ANTHROPIC_API_KEY", "")
     # Always read as UTF-8 to avoid UnicodeDecodeError
-    current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
+    current_prompt = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
     current_cv_channel = os.getenv("CHRISTIANVISION_CHANNEL", "")
     current_cv_en_channel_id = os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", "")
     current_snk_channel = os.getenv("SHALTNOTKILL_CHANNEL", "")
@@ -32,7 +31,7 @@ def admin_config():
         if action == "load":
             current_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
             current_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-            current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
+            current_prompt = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
             current_cv_channel = os.getenv("CHRISTIANVISION_CHANNEL", "")
             current_cv_en_channel_id = os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", "")
             current_snk_channel = os.getenv("SHALTNOTKILL_CHANNEL", "")
@@ -82,7 +81,7 @@ def admin_config():
             if new_api_key:
                 os.environ["ANTHROPIC_API_KEY"] = new_api_key
             if new_prompt:
-                TEMPLATE_PATH.write_text(new_prompt, encoding="utf-8")
+                PROMPT_TEMPLATE_PATH.write_text(new_prompt, encoding="utf-8")
             if new_cv_channel:
                 os.environ["CHRISTIANVISION_CHANNEL"] = new_cv_channel
             if new_cv_en_channel_id:
@@ -105,7 +104,7 @@ def admin_config():
             # Reload current values after saving
             current_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
             current_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-            current_prompt = TEMPLATE_PATH.read_text(encoding="utf-8")
+            current_prompt = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
             current_cv_channel = os.getenv("CHRISTIANVISION_CHANNEL", "")
             current_cv_en_channel_id = os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", "")
             current_snk_channel = os.getenv("SHALTNOTKILL_CHANNEL", "")

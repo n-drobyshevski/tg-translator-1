@@ -11,20 +11,24 @@ Bidirectional Pyrogram ⇆ PTB relay bot.
 
 from __future__ import annotations
 
+import os
+import sys
+# ensure project root is on PYTHONPATH when running this file directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
 import asyncio
 import html
 import logging
-import os
 import requests
 import signal
-import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import Anthropic
-from .config import CONFIG
-from .models import MetadataRequest, MessageEvent
+from translator.config import CONFIG, PROMPT_TEMPLATE_PATH, load_prompt_template
+from translator.models import MetadataRequest, MessageEvent
 
 from pyrogram import filters
 from pyrogram.client import Client
@@ -33,20 +37,20 @@ from telegram.error import TelegramError
 from telegram.ext import Application
 
 # === Utility imports ===
-from .utils.utils_html import entities_to_html
-from .utils.utils_async import run_with_retries
-from .utils.translation_utils import translate_html
-from .utils.message_utils import (
+from translator.utils.utils_html import entities_to_html
+from translator.utils.utils_async import run_with_retries
+from translator.utils.translation_utils import translate_html
+from translator.utils.message_utils import (
     get_media_info,
     build_payload,
     log_and_store_message,
     extract_channel_info,
 )
-from .utils.channel_utils import TelegramAPI, format_channel_id, validate_channel
+from translator.utils.channel_utils import TelegramAPI, format_channel_id, validate_channel
 
-from .services.telegram_sender import TelegramSender
-from .services.channel_logger import store_message
-from .services.stats_logger import record_event, build_event_kwargs
+from translator.services.telegram_sender import TelegramSender
+from translator.services.channel_logger import store_message
+from translator.services.stats_logger import record_event, build_event_kwargs
 
 # PTB optional rate limiter
 try:
@@ -68,60 +72,6 @@ logging.basicConfig(
 logger = logging.getLogger("MAIN")
 pyro_log = logging.getLogger("PYRO")
 ptb_log = logging.getLogger("PTB")
-
-###############################################################################
-# Template
-###############################################################################
-TEMPLATE_PATH = Path(__file__).parent / "prompt_template.txt"
-PROMPT_TEMPLATE = (
-    TEMPLATE_PATH.read_text(encoding="utf-8")
-    if TEMPLATE_PATH.exists()
-    else "{message_text}"
-)
-###############################################################################
-# Конфиг и инициализация клиентов
-###############################################################################
-
-
-def load_config() -> Dict[str, str]:
-    # No longer needed; use CONFIG directly everywhere
-    return {
-        "BOT_TOKEN": CONFIG.TELEGRAM_BOT_TOKEN,
-        "ANTHROPIC_API_KEY": CONFIG.ANTHROPIC_API_KEY,
-        "CHRISTIANVISION_CHANNEL": str(CONFIG.CHANNELS["christianvision"]),
-        "SHALTNOTKILL_CHANNEL": str(CONFIG.CHANNELS["shaltnotkill"]),
-        "SOURCE_TEST_ID": str(CONFIG.CHANNELS["test"]),
-    }
-
-
-def init_clients(
-    env: Dict[str, str],
-) -> Tuple[Client, Application, Anthropic, TelegramSender]:
-    pyro = Client(
-        "bot",
-        api_id=CONFIG.TELEGRAM_API_ID,
-        api_hash=CONFIG.TELEGRAM_API_HASH,
-        bot_token=CONFIG.TELEGRAM_BOT_TOKEN,
-    )
-    builder = Application.builder().token(CONFIG.TELEGRAM_BOT_TOKEN)
-    if AIORateLimiter is not None:
-        try:
-            builder = builder.rate_limiter(AIORateLimiter())
-        except RuntimeError:
-            pass
-    ptb_app = builder.build()
-    anthropic_client = Anthropic(api_key=env["ANTHROPIC_API_KEY"])
-    sender = TelegramSender()
-    return pyro, ptb_app, anthropic_client, sender
-
-
-def get_channel_mapping(env: Dict[str, str]) -> Dict[int, str]:
-    return {
-        int(env["CHRISTIANVISION_CHANNEL"]): "christianvision",
-        int(env["SHALTNOTKILL_CHANNEL"]): "shaltnotkill",
-        int(env["SOURCE_TEST_ID"]): "test",
-    }
-
 
 ###############################################################################
 # PTB‑worker (метаданные вложений)
@@ -214,6 +164,8 @@ def register_handlers(
 
         payload = build_payload(msg, html_text, meta)
         msg_id = log_and_store_message(msg, html_text)
+        pyro_log.info("Payload data: %s", payload)
+        pyro_log.info("Logged message id: %s", msg_id)
         translation_start = time.monotonic()
         retry_count = 0
         translation_time = None
@@ -324,9 +276,8 @@ def register_handlers(
 ###############################################################################
 async def main_async():
     logger.info("=== BOT STARTUP ===")
-    env = load_config()
-    pyro, ptb_app, anthropic, sender = init_clients(env)
-    mapping = get_channel_mapping(env)
+    pyro, ptb_app, anthropic, sender = init_clients()
+    mapping = get_channel_mapping()
 
     register_handlers(pyro, anthropic, sender, mapping)
     # register_channel_logger(pyro)
@@ -352,6 +303,33 @@ async def main_async():
     await ptb_app.stop()
     await pyro.stop()
     logger.info("=== BOT SHUTDOWN COMPLETE ===")
+
+
+def init_clients() -> Tuple[Client, Application, Anthropic, TelegramSender]:
+    pyro = Client(
+        "bot",
+        api_id=CONFIG.TELEGRAM_API_ID,
+        api_hash=CONFIG.TELEGRAM_API_HASH,
+        bot_token=CONFIG.TELEGRAM_BOT_TOKEN,
+    )
+    builder = Application.builder().token(CONFIG.TELEGRAM_BOT_TOKEN)
+    if AIORateLimiter is not None:
+        try:
+            builder = builder.rate_limiter(AIORateLimiter())
+        except RuntimeError:
+            pass
+    ptb_app = builder.build()
+    anthropic_client = Anthropic(api_key=CONFIG.ANTHROPIC_API_KEY)
+    sender = TelegramSender()
+    return pyro, ptb_app, anthropic_client, sender
+
+
+def get_channel_mapping() -> Dict[int, str]:
+    return {
+        int(CONFIG.CHANNELS["christianvision"]): "christianvision",
+        int(CONFIG.CHANNELS["shaltnotkill"]): "shaltnotkill",
+        int(CONFIG.CHANNELS["test"]): "test",
+    }
 
 
 if __name__ == "__main__":
