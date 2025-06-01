@@ -134,3 +134,19 @@ def build_10d_by_channel(messages: list[dict]) -> dict:
     labels = list(data.keys())
     counts = [data[ch] for ch in labels]
     return {"labels": labels, "counts": counts}
+
+
+def build_throughput_latency(messages):
+    """
+    Returns data for a scatter plot: original_size vs translation_time.
+    """
+    scatter = [
+        {
+            "x": m.get("original_size", 0),
+            "y": m.get("translation_time", 0),
+            "label": m.get("source_channel_name", "") or m.get("source_channel", ""),
+        }
+        for m in messages
+        if m.get("original_size") is not None and m.get("translation_time") is not None
+    ]
+    return {"points": scatter}

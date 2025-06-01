@@ -3,6 +3,7 @@
 let posts10dChart = null;
 let posts10dChannelsChart = null;
 let heatmapChart = null;
+let throughputLatencyChart = null;
 
 /* Build (or update) the chart */
 function drawPosts10d({ labels, counts }) {
@@ -164,6 +165,8 @@ async function loadMetrics() {
     const json = await res.json();
     console.log(json);
     if (json.posts_10d) drawPosts10d(json.posts_10d);
+    if (json.throughput_latency) drawThroughputLatency(json.throughput_latency);
+
     if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
     if (json.posts_matrix) {
       drawHeatmap(json.posts_matrix);
@@ -327,4 +330,49 @@ async function loadPostsPerChannelChart(days) {
   } catch (err) {
     console.error("Posts per Channel fetch failed:", err);
   }
+}
+function drawThroughputLatency({ points }) {
+  const ctx = document.getElementById("chartThroughputLatency");
+  if (!ctx) return;
+  if (throughputLatencyChart) throughputLatencyChart.destroy();
+  throughputLatencyChart = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Msg size vs. translation time",
+          data: points,
+          pointRadius: 5,
+          backgroundColor: "rgba(59,130,246,0.6)",
+          borderColor: "#3b82f6",
+          parsing: false, // disables default parsing for scatter
+        },
+      ],
+    },
+    options: {
+      scales: {
+        x: {
+          title: { display: true, text: "Original size (chars)" },
+          beginAtZero: true,
+        },
+        y: {
+          title: { display: true, text: "Translation time (s)" },
+          beginAtZero: true,
+        },
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = ctx.raw;
+              return `Size: ${d.x}, Latency: ${d.y.toFixed(2)}s, Channel: ${
+                d.label
+              }`;
+            },
+          },
+        },
+        legend: { display: false },
+      },
+    },
+  });
 }

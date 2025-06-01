@@ -10,8 +10,14 @@ from admin_config import admin_config_bp
 from admin_manager import admin_manager_bp
 from admin_cache import admin_cache_bp
 from app.admin_events import admin_stats_bp
-from aggregator import build_summary, build_10d_channels, build_hourly_matrix
-from aggregator import load_messages, build_summary, build_hourly_matrix
+from aggregator import (
+    build_summary,
+    build_10d_channels,
+    build_hourly_matrix,
+    build_throughput_latency,
+    load_messages
+)
+
 
 # use absolute import
 
@@ -83,6 +89,7 @@ def metrics_summary():
             "posts_10d": build_summary(messages, days),
             "posts_10d_channels": build_10d_channels(messages, days),
             "posts_matrix": build_hourly_matrix(messages),
+            "throughput_latency": build_throughput_latency(messages),  # <--- ADD THIS
         }
     except Exception as exc:
         current_app.logger.exception("summary route failed")
