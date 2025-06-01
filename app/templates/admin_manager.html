@@ -1,20 +1,14 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="UTF-8">
-    <title>Channel Message Translation</title>
+    <meta charset="UTF-8" />
+    <title>Message Manager</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <style>
-      body {
-        font-family: 'Roboto', sans-serif;
-      }
-      /* Remove #loading_spinner CSS here, handled in component */
-      .toggle-btn {
-        margin-bottom: 0.5em;
-      }
+      body { font-family: 'Roboto', sans-serif; }
       .message-preview {
         display: -webkit-box;
         -webkit-line-clamp: 7;
@@ -22,8 +16,8 @@
         overflow: hidden;
         max-height: 11.9em;
         transition: max-height 0.3s;
-        background-color: #f9fafb; /* same bg-gray-50 */
-        border-left: 4px solid #bfdbfe; /* border-blue-200 */
+        background-color: #f9fafb;
+        border-left: 4px solid #bfdbfe;
         border-radius: 0.25rem;
         padding: 0.75rem;
         margin-top: 0.5rem;
@@ -38,444 +32,425 @@
     </style>
   </head>
   <body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen">
-    <div class="container mx-auto mt-8 px-2 sm:px-4">
+    <div class="container mx-auto mt-8 px-4 sm:px-6 lg:px-8">
+      <!-- Header + Back Button -->
       <div class="flex items-center mb-6">
         {% set href = '/admin' %}
         {% include 'components/back_button.html' %}
-        <h1 class="text-3xl font-bold mt-[-5px]">Message Manager</h1>
+        <h1 class="text-2xl sm:text-3xl font-bold ml-2">Message Manager</h1>
       </div>
-      <hr class="mb-6">
-      <h2 class="text-2xl font-bold mb-6">Channel Message Translation</h2>
-      <!-- Step 1: Select source channel -->
-      <form method="post" class="mb-6 bg-white shadow-lg rounded-lg p-6">
-        <label for="source_channel" class="font-medium mb-1 block">Select source channel:</label>
-        <select name="source_channel" id="source_channel" class="border rounded px-3 py-2 w-full md:w-auto" required>
-          <option value="">-- Select --</option>
-          {% for ch in channels %}
-            <option value="{{ ch.id }}" {% if selected_channel_id == ch.id %}selected{% endif %}>
-              {{ ch.name |e}} ({{ ch.id }}){% if ch.is_en %} [EN]{% endif %}
-            </option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">Load Messages</button>
-      </form>
-      <!-- Step 2: Select message -->
-      {% if recent_messages %}
-        <form method="post" class="mb-6 bg-white shadow-lg rounded-lg p-6" id="message-form">
-          <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
+      <hr class="mb-6 border-gray-300" />
+      <h2 class="text-xl sm:text-2xl font-semibold mb-6">Channel Message Translation</h2>
 
-          <label for="message_id" class="font-medium mb-1 block">Select message:</label>
-          <select name="message_id"
-                  id="message_id"
-                  class="border rounded px-3 py-2 w-full md:w-auto"
-                  required
-                  onchange="updatePreviewContent();">
-            {% for msg in recent_messages %}
-              <option value="{{ msg.id }}"
-                      data-full="{{ msg.html|e }}"
-                      {% if selected_message_id == msg.id|string %}selected{% endif %}>
-                {{ msg.timestamp }} | {{ msg.html|truncate(80) }}
-              </option>
+      <!-- Step 1: Select Source Channel -->
+      <form method="post" class="mb-8 bg-white shadow-lg rounded-lg p-6">
+        <label for="source_channel" class="block text-gray-700 font-medium mb-2">Select source channel:</label>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4 flex-wrap">
+          <select id="source_channel" name="source_channel" required
+            class="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-auto min-w-0 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">-- Select --</option>
+            {% for ch in channels %}
+            <option value="{{ ch.id }}" {% if selected_channel_id == ch.id %}selected{% endif %}>
+              {{ ch.name |e }} ({{ ch.id }}){% if ch.is_en %} [EN]{% endif %}
+            </option>
             {% endfor %}
           </select>
-          <div class="flex gap-2 mt-2 flex-wrap">
-            {% if not selected_channel_is_en %}
-              <button type="submit" name="action" value="translate" id="translate_btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition flex items-center gap-2">
-                <i class="fa-regular fa-paper-plane"></i>
-                Translate
-              </button>
-            {% else %}
-              <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded flex-grow">Translation is not available for EN channels. You can only delete messages.</div>
-            {% endif %}
-            <button type="button" class="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition flex items-center gap-2" onclick="togglePreview()">
-              <i class="fa-regular fa-eye"></i>
-              Preview
-            </button>
-            <button type="submit" name="action" value="delete" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition flex items-center gap-2"
-              onclick="return confirm('Are you sure you want to delete this message?');">
-              <i class="fa-regular fa-trash-can"></i>
-              Delete Selected Message
-            </button>
-          </div>
-        </form>
-        <div id="preview-area" class="bg-white shadow rounded-lg p-6 mb-6 hidden">
-          <div class="mt-2">
-            <strong>Message Preview:</strong>
-            <div id="preview-content"
-              class="message-preview expanded"
-              style="white-space: pre-line;">
-              <!-- Will be filled by js-->
-            </div>
-          </div>
+          <button type="submit"
+            class="mt-4 sm:mt-0 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition w-full sm:w-auto flex items-center justify-center">
+            <i class="fa-solid fa-download mr-2"></i>
+            Load Messages
+          </button>
         </div>
-        <script>
-          function togglePreview() {
-            var preview = document.getElementById('preview-area');
-            if (preview.style.display === 'none' || preview.style.display === '') {
-              updatePreviewContent();
-              preview.style.display = 'block';
-            } else {
-              preview.style.display = 'none';
-            }
-          }
-          function updatePreviewContent() {
-            var select = document.getElementById('message_id');
-            var selected = select.options[select.selectedIndex];
-            var content = selected.getAttribute('data-full') || '';
-            document.getElementById('preview-content').innerHTML = content;
-            // sync hidden message_id for posting/editing
-            var hidden = document.getElementById('translation_message_id');
-            if (hidden) hidden.value = select.value;
-          }
-          // Initialize preview content on page load if preview is visible
-          document.addEventListener('DOMContentLoaded', function() {
-            if (document.getElementById('preview-area').style.display !== 'none') {
-              updatePreviewContent();
-            }
-          });
-        </script>
-      {% endif %}
-      <!-- Step 3: Show translation result -->
-      {% if translation_result %}
-        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-            <div class="flex flex-col h-full">
-              <div class="flex items-center mb-2">
-                <h4 class="text-lg font-semibold flex-grow">Source Message</h4>
-                <a href="javascript:void(0)"
-                   id="editSourceBtn"
-                   class="ml-2 text-blue-600 hover:underline"
-                   onclick="toggleSourceEditMode()">
-                   Edit
-                </a>
-              </div>
-              <!-- Source message edit mode -->
-              <div id="source-edit-area" class="mb-2 hidden flex flex-col flex-grow">
-                <textarea id="source-edit-textarea"
-                          class="w-full flex-grow border rounded p-2 text-sm resize-y"
-                          style="min-height:200px;"
-                          rows="12">{{ selected_message_text|trim }}</textarea>
-                <div class="flex gap-2 mt-2">
-                  <button type="button"
-                          class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                          onclick="saveSourceEdit()">
-                    Save & Translate
-                  </button>
-                  <button type="button"
-                          class="px-3 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400"
-                          onclick="cancelSourceEdit()">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <div id="source-message-block"
-                   class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded flex flex-col justify-start">
-                <div class="h-full flex flex-col justify-start" style="white-space: pre-line;">
-                  <span class="text-left" id="source-message-content">
-                    {{ selected_message_text|trim|safe }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="flex flex-col h-full">
-              <div class="flex items-center mb-2">
-                <h4 class="text-lg font-semibold flex-grow">Translation Result</h4>
-                <button type="button"
-                        class="ml-auto px-2 py-1 text-blue-600 hover:underline"
-                        onclick="
-                          const srcRaw = document.getElementById('raw-html-source');
-                          const srcBlock = document.getElementById('source-message-block');
-                          const tgtRaw = document.getElementById('raw-html-content');
-                          const tgtBlock = document.getElementById('translated-message-block');
-                          const showRaw = (srcRaw.style.display === 'none' || srcRaw.style.display === '') && (tgtRaw.style.display === 'none' || tgtRaw.style.display === '');
-                          if (showRaw) {
-                            srcRaw.style.display = 'block';
-                            srcBlock.style.display = 'none';
-                            tgtRaw.style.display = 'block';
-                            tgtBlock.style.display = 'none';
-                          } else {
-                            srcRaw.style.display = 'none';
-                            srcBlock.style.display = 'block';
-                            tgtRaw.style.display = 'none';
-                            tgtBlock.style.display = 'block';
-                          }
-                        ">
-                Toggle Raw HTML
-              </button>
-              </div>
-              <div id="raw-html-content"
-                   class="border border-blue-200 bg-gray-50 rounded p-3 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                   style="white-space: pre-line; display: none;">
-                <pre class="m-0 p-0">{{ raw_html_result }}</pre>
-              </div>
-              <div id="translated-message-block"
-                   class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 flex-grow h-full message-preview expanded">
-                <div class="mt-2 h-full" style="white-space: pre-line;">{{ raw_html_result|safe }}</div>
-              </div>
-            </div>
-          </div>
-          <div class="clearfix"></div>
-        </div>
+      </form>
 
-        <!-- New card: Select target channel and post -->
-        <div class="bg-white shadow-lg rounded-lg p-6 mb-6">
-          <form method="post"
-                action="/admin/manager"
-                id="translationForm"
-                class="space-y-4"
-                onsubmit="updateTargetChannelId()">
-            <input type="hidden" name="source_channel" value="{{ selected_channel_id }}">
-            <input type="hidden" id="translation_message_id" name="message_id" value="{{ selected_message_id }}">
-            <input type="hidden" name="action" id="translation-action" value="">
-            <input type="hidden" name="target_channel_id" id="target_channel_id" value="">
-            <input type="hidden" name="translation_result" value="{{ translation_result|e }}">
-            <input type="hidden" name="raw_html_result" value="{{ raw_html_result|e }}">
-            <!-- New: option to replace existing message variant -->
-            <label for="target_channel" class="font-medium block">Select target channel:</label>
-           
-            <select name="target_channel"
-                    id="target_channel"
-                    class="border rounded px-3 py-2 w-full md:w-auto"
-                    required
-                    onchange="updateTargetChannelId()">
-              {% for ch in target_channels %}
-                <option value="{{ ch.type }}" 
-                        data-channel-id="{{ ch.id }}"
-                  {% if selected_target_type == ch.type %}selected{% endif %}>
-                  {{ ch.name|e }}
-                </option>
+      <!-- Step 2: Select Message & Actions -->
+      {% if recent_messages %}
+      <div class="space-y-8">
+        <form method="post" id="message-form" class="bg-white shadow-lg rounded-lg p-6">
+          <input type="hidden" name="source_channel" value="{{ selected_channel_id }}" />
+          <label for="message_id" class="block text-gray-700 font-medium mb-2">Select message:</label>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+            <select id="message_id" name="message_id" required onchange="updatePreviewContent();"
+              class="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500">
+              {% for msg in recent_messages %}
+              <option value="{{ msg.id }}" data-full="{{ msg.html|e }}"
+                {% if selected_message_id == msg.id|string %}selected{% endif %}>
+                {{ msg.timestamp }} | {{ msg.html|truncate(80) }}
+              </option>
               {% endfor %}
             </select>
-            <div class="mt-2">
+            <div class="flex flex-wrap mt-4 sm:mt-0 gap-2">
+              {% if not selected_channel_is_en %}
+              <button type="submit" name="action" value="translate" id="translate_btn"
+                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center"
+                onclick="showSpinner('Translating... Please wait.')">
+                <i class="fa-regular fa-paper-plane mr-2"></i>Translate
+              </button>
+              {% else %}
+              <div
+                class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-2 rounded-lg flex-grow">
+                Translation not available for EN channels. Only deletion allowed.
+              </div>
+              {% endif %}
+              <button type="button"
+                class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition flex items-center"
+                onclick="togglePreview()">
+                <i class="fa-regular fa-eye mr-2"></i>Preview
+              </button>
+              <button type="submit" name="action" value="delete"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center"
+                onclick="return confirm('Are you sure you want to delete this message?');">
+                <i class="fa-regular fa-trash-can mr-2"></i>Delete
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Preview Area -->
+        <div id="preview-area" class="hidden bg-white shadow rounded-lg p-6">
+          <div>
+            <strong class="text-gray-700">Message Preview:</strong>
+            <div id="preview-content" class="message-preview expanded"
+              style="white-space: pre-line;">
+              <!-- Filled by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Translation Result & Source Edit -->
+        {% if translation_result %}
+        <div class="bg-white shadow-lg rounded-lg p-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+            <!-- Source Message Column -->
+            <div class="flex flex-col">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-lg font-semibold">Source Message</h4>
+                <button type="button" id="editSourceBtn"
+                  class="text-blue-600 hover:underline text-sm"
+                  onclick="toggleSourceEditMode()">Edit</button>
+              </div>
+              <div id="source-edit-area" class="hidden flex flex-col mb-4">
+                <textarea id="source-edit-textarea" rows="10"
+                  class="w-full border border-gray-300 rounded-lg p-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-green-500"
+                  style="min-height: 200px;">{{ selected_message_text|trim }}</textarea>
+                <div class="flex space-x-2 mt-3">
+                  <button type="button"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                    onclick="saveSourceEdit()">Save & Translate</button>
+                  <button type="button"
+                    class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition text-sm"
+                    onclick="cancelSourceEdit()">Cancel</button>
+                </div>
+              </div>
+              <!-- raw HTML source, hidden by default -->
+              <div id="raw-html-source"
+                class="border border-blue-200 bg-gray-50 rounded-lg p-4 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
+                style="white-space: pre-line; display: none;">
+                <pre class="m-0">{{ selected_message_text|e }}</pre>
+              </div>
+              <div id="source-message-block"
+                class="border-l-4 border-blue-200 bg-gray-50 rounded-lg p-4 text-sm text-gray-800 message-preview expanded"
+                style="white-space: pre-line;">
+                <span id="source-message-content">
+                  {{ selected_message_text|trim|safe }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Translated Message Column -->
+            <div class="flex flex-col">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-lg font-semibold">Translation Result</h4>
+                <button id="toggleRawBtn" type="button"
+                  class="text-blue-600 hover:underline text-sm">
+                  Toggle Raw HTML
+                </button>
+              </div>
+              <div id="raw-html-content"
+                class="border border-blue-200 bg-gray-50 rounded-lg p-4 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
+                style="white-space: pre-line; display: none;">
+                <pre class="m-0">{{ raw_html_result }}</pre>
+              </div>
+              <div id="translated-message-block"
+                class="border-l-4 border-blue-200 bg-gray-50 rounded-lg p-4 text-sm text-gray-800 message-preview expanded">
+                <div class="mt-2" style="white-space: pre-line;">
+                  {{ raw_html_result|safe }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Select Target Channel & Post -->
+        <div class="bg-white shadow-lg rounded-lg p-6">
+          <form method="post" action="/admin/manager" id="translationForm"
+            class="space-y-6" onsubmit="updateTargetChannelId()">
+            <input type="hidden" name="source_channel" value="{{ selected_channel_id }}" />
+            <input type="hidden" id="translation_message_id" name="message_id" value="{{ selected_message_id }}" />
+            <input type="hidden" name="action" id="translation-action" value="" />
+            <input type="hidden" name="target_channel_id" id="target_channel_id" value="" />
+            <input type="hidden" name="translation_result" value="{{ translation_result|e }}" />
+            <input type="hidden" name="raw_html_result" value="{{ raw_html_result|e }}" />
+
+            <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+              <label for="target_channel"
+                class="block text-gray-700 font-medium mb-2 sm:mb-0">Select target channel:</label>
+              <select id="target_channel" name="target_channel" required onchange="updateTargetChannelId()"
+                class="border border-gray-300 rounded-lg px-3 py-2 w-full sm:w-auto focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {% for ch in target_channels %}
+                <option value="{{ ch.type }}" data-channel-id="{{ ch.id }}"
+                  {% if selected_target_type == ch.type %}selected{% endif %}>
+                  {{ ch.name |e }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="flex items-center">
               <label class="inline-flex items-center">
-                <input type="checkbox"
-                       name="edit_mode"
-                       id="edit_mode"
-                       class="form-checkbox"
-                       checked>
-                <span class="ml-2">Edit last message in target channel instead of posting new</span>
+                <input type="checkbox" name="edit_mode" id="edit_mode"
+                  class="form-checkbox h-5 w-5 text-blue-600" checked />
+                <span class="ml-2 text-gray-700 text-sm">
+                  Edit last message in target channel instead of posting new</span>
               </label>
             </div>
 
             <button type="button" id="postBtn"
-                    class="mt-2 px-4 py-2 bg-yellow-400 text-gray-900 rounded hover:bg-yellow-500 transition">
-              Post
+              class="w-full sm:w-auto px-4 py-2 bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-500 transition flex items-center justify-center">
+              <i class="fa-solid fa-paper-plane mr-2"></i>Post
             </button>
           </form>
-          
+
           {% if post_result %}
-            <div id="postResultBox" class="mt-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-              {{ post_result }}
-            </div>
+          <div id="postResultBox"
+            class="mt-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg text-sm">
+            {{ post_result }}
+          </div>
           {% endif %}
           {% if delete_result %}
-            <div class="mt-2 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-              {{ delete_result }}
-            </div>
+          <div class="mt-2 bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg text-sm">
+            {{ delete_result }}
+          </div>
           {% endif %}
         </div>
-      {% endif %} 
-      
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
+
     {% set spinner_text = "Processing... Please wait." %}
     {% include 'components/spinner_loader.html' %}
+
+    <!-- Spacer -->
     <div class="h-16"></div>
-    <!--  Post Validation Dialog -->
-    <div id="postDialog" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
-      <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm" id="postDialogBox">
+
+    <!-- Post Confirmation Dialog -->
+    <div id="postDialog"
+      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
+      <div id="postDialogBox"
+        class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
         <div class="text-lg font-semibold mb-4 text-gray-800">Confirm Post</div>
-        <div class="mb-6 text-gray-700">Are you sure you want to post the translation?</div>
+        <div class="mb-6 text-gray-700">
+          Are you sure you want to post the translation?
+        </div>
         <div class="flex justify-end gap-2">
-          <button type="button" id="cancelPostDialog" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Cancel</button>
-          <button name="action" value="post" type="button" id="confirmPostDialog" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Post</button>
+          <button type="button" id="cancelPostDialog"
+            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+            Cancel
+          </button>
+          <button name="action" value="post" type="button" id="confirmPostDialog"
+            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+            Post
+          </button>
         </div>
       </div>
     </div>
-    <!-- Add script for success pop-up after posting translation -->
+
     <script>
-      // define missing function to sync hidden input with selected target channel
+      // Sync hidden input 'target_channel_id' with selection
       function updateTargetChannelId() {
-        var sel = document.getElementById('target_channel');
+        const sel = document.getElementById('target_channel');
         if (!sel) return;
-        // grab the real ID from data-channel-id
         document.getElementById('target_channel_id').value =
-          sel.options[sel.selectedIndex].getAttribute('data-channel-id')||'';
+          sel.options[sel.selectedIndex].getAttribute('data-channel-id') || '';
       }
-
-      // Custom dialog logic for post validation
-      document.addEventListener("DOMContentLoaded", function() {
-          // initialize only when select exists
-          updateTargetChannelId();
-
-          const postBtn = document.getElementById("postBtn");
-          const postDialog = document.getElementById("postDialog");
-          const postDialogBox = document.getElementById("postDialogBox");
-          const cancelBtn = document.getElementById("cancelPostDialog");
-          const confirmBtn = document.getElementById("confirmPostDialog");
-          const form = document.getElementById("translationForm");
-
-          if (postBtn && postDialog && cancelBtn && confirmBtn && form) {
-              postBtn.addEventListener("click", function(e) {
-                  e.preventDefault();
-                  document.getElementById("translation-action").value = "post";
-                  updateTargetChannelId();
-                  // log selected target channel id
-                  console.log("Selected target_channel_id:", document.getElementById("target_channel_id").value);
-                  postDialog.classList.remove("hidden");
-              });
-              cancelBtn.addEventListener("click", function() {
-                  postDialog.classList.add("hidden");
-              });
-              confirmBtn.addEventListener("click", function() {
-                  postDialog.classList.add("hidden");
-                  document.getElementById("translation-action").value = "post";
-                  updateTargetChannelId();
-                  form.submit();
-              });
-              postDialog.addEventListener("mousedown", function(e) {
-                  if (!postDialogBox.contains(e.target)) {
-                      postDialog.classList.add("hidden");
-                  }
-              });
-          }
-
-          // Success/failure pop-up after posting translation
-          const postResult = "{{ post_result }}";
-          if(postResult && postResult !== "None"){
-             const popup = document.createElement('div');
-
-  // Include selected channel in success message
-  let channelText = '';
-  const sc = document.getElementById('source_channel');
-  if (sc) {
-    channelText = sc.options[sc.selectedIndex].textContent.trim();
-  }
-
-  popup.innerText = postResult + ' (Channel: ' + channelText + ')';
-             if (postResult.toLowerCase().includes("fail") || postResult.toLowerCase().includes("error")) {
-                 popup.className = "fixed top-4 right-4 bg-red-200 text-red-800 p-4 rounded shadow-lg z-50";
-             } else {
-                 popup.className = "fixed top-4 right-4 bg-green-200 text-green-800 p-4 rounded shadow-lg z-50";
-             }
-             document.body.appendChild(popup);
-             const box = document.getElementById('postResultBox');
-             if(box) box.scrollIntoView({behavior: "smooth", block: "center"});
-          }
-      });
-
-      // Show spinner loader for all translation and post actions
-      function showSpinner(text) {
-        var spinner = document.getElementById('loading_spinner');
-        var spinnerText = document.getElementById('loading_spinner_text');
-        if (spinnerText && text) spinnerText.textContent = text;
-        if (spinner) spinner.classList.remove('hidden');
-      }
-
-      function hideSpinner() {
-        var spinner = document.getElementById('loading_spinner');
-        if (spinner) spinner.classList.add('hidden');
-      }
-
-      document.addEventListener("DOMContentLoaded", function() {
-        var translateBtn = document.getElementById('translate_btn');
-        if (translateBtn) {
-          translateBtn.addEventListener('click', function() {
-            showSpinner("Translating... Please wait. This may take a few seconds.");
-          });
+      // Toggle preview display
+      function togglePreview() {
+        const preview = document.getElementById('preview-area');
+        if (!preview) return;
+        if (preview.classList.contains('hidden')) {
+          updatePreviewContent();
+          preview.classList.remove('hidden');
+        } else {
+          preview.classList.add('hidden');
         }
-
-        var saveTranslateBtn = document.querySelector('#source-edit-area button[onclick*="saveSourceEdit"]');
-        if (saveTranslateBtn) {
-          saveTranslateBtn.addEventListener('click', function() {
-            showSpinner("Translating and saving... Please wait.");
-          });
-        }
-
-        var postBtn = document.getElementById("postBtn");
-        var confirmBtn = document.getElementById("confirmPostDialog");
-        if (postBtn && confirmBtn) {
-          postBtn.addEventListener("click", function() {
-            // spinner will be shown on confirm
-          });
-          confirmBtn.addEventListener("click", function() {
-            showSpinner("Posting translation... Please wait.");
-          });
+      }
+      function updatePreviewContent() {
+        const select = document.getElementById('message_id');
+        if (!select) return;
+        const selected = select.options[select.selectedIndex];
+        const content = selected.getAttribute('data-full') || '';
+        document.getElementById('preview-content').innerHTML = content;
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        const preview = document.getElementById('preview-area');
+        if (preview && !preview.classList.contains('hidden')) {
+          updatePreviewContent();
         }
       });
-
+      // Toggle source edit mode
       function toggleSourceEditMode() {
-        var editArea = document.getElementById('source-edit-area');
-        var block = document.getElementById('source-message-block');
-        if (editArea.style.display === 'none' || editArea.classList.contains('hidden')) {
+        const editArea = document.getElementById('source-edit-area');
+        const block = document.getElementById('source-message-block');
+        if (!editArea || !block) return;
+        if (editArea.classList.contains('hidden')) {
           editArea.classList.remove('hidden');
-          editArea.style.display = 'flex';
-          block.style.display = 'none';
-          // Expand textarea to available height
-          setTimeout(function() {
-            var ta = document.getElementById('source-edit-textarea');
+          block.classList.add('hidden');
+          setTimeout(() => {
+            const ta = document.getElementById('source-edit-textarea');
             if (ta) {
-              ta.style.height = (window.innerHeight * 0.4) + "px";
+              ta.style.height = window.innerHeight * 0.4 + 'px';
             }
           }, 100);
         } else {
           editArea.classList.add('hidden');
-          editArea.style.display = 'none';
-          block.style.display = 'block';
+          block.classList.remove('hidden');
         }
       }
-
+      // Save edited source and retranslate
       function saveSourceEdit() {
-        var textarea = document.getElementById('source-edit-textarea');
-        var content = textarea.value;
-        var messageId = document.getElementById('message_id').value;
-        var sourceChannel = document.getElementById('source_channel').value;
-
-        // Optimistically update the translated-message-block with a loading state
-        var tBlock = document.getElementById('translated-message-block');
+        const textarea = document.getElementById('source-edit-textarea');
+        const content = textarea ? textarea.value : '';
+        const messageIdElem = document.getElementById('message_id');
+        const sourceChannelElem = document.getElementById('source_channel');
+        const messageId = messageIdElem ? messageIdElem.value : '';
+        const sourceChannel = sourceChannelElem ? sourceChannelElem.value : '';
+        const tBlock = document.getElementById('translated-message-block');
         if (tBlock) {
-          tBlock.innerHTML = '<div class="text-gray-500 italic">Translating...</div>';
+          tBlock.innerHTML =
+            '<div class="text-gray-500 italic">Translating...</div>';
         }
-
-        var form = document.createElement('form');
+        const form = document.createElement('form');
         form.method = 'post';
         form.action = window.location.pathname;
-
         [
           ['source_channel', sourceChannel],
-          ['message_id',    messageId],
-          ['action',        'translate'],
-          ['edited_source', content]
-        ].forEach(function(pair) {
-          var input = document.createElement('input');
+          ['message_id', messageId],
+          ['action', 'translate'],
+          ['edited_source', content],
+        ].forEach(([name, value]) => {
+          const input = document.createElement('input');
           input.type = 'hidden';
-          input.name = pair[0];
-          input.value = pair[1];
+          input.name = name;
+          input.value = value;
           form.appendChild(input);
         });
-
-        // Let server know we want to see updated translation on reload
-        var showResult = document.createElement('input');
+        const showResult = document.createElement('input');
         showResult.type = 'hidden';
         showResult.name = 'show_result';
         showResult.value = '1';
         form.appendChild(showResult);
-
         document.body.appendChild(form);
         form.submit();
       }
-
-      function cancelSourceEdit() {
-        toggleSourceEditMode();
+      function cancelSourceEdit() { toggleSourceEditMode(); }
+      // Show spinner text for actions
+      function showSpinner(text) {
+        const spinner = document.getElementById('loading_spinner');
+        const spinnerText = document.getElementById('loading_spinner_text');
+        if (spinnerText && text) spinnerText.textContent = text;
+        if (spinner) spinner.classList.remove('hidden');
       }
-
-      function redoTranslation() {
-        // Submit the translation form with action=translate
-        var form = document.getElementById('translationForm');
-        if (form) {
-          document.getElementById('translation-action').value = 'translate';
-          form.submit();
+      function hideSpinner() {
+        const spinner = document.getElementById('loading_spinner');
+        if (spinner) spinner.classList.add('hidden');
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        const translateBtn = document.getElementById('translate_btn');
+        if (translateBtn) {
+          translateBtn.addEventListener('click', () => {
+            showSpinner('Translating... Please wait.');
+          });
         }
-      }
+        const saveTranslateBtn = document.querySelector(
+          '#source-edit-area button[onclick*="saveSourceEdit"]'
+        );
+        if (saveTranslateBtn) {
+          saveTranslateBtn.addEventListener('click', () => {
+            showSpinner('Translating and saving... Please wait.');
+          });
+        }
+        const postBtn = document.getElementById('postBtn');
+        const postDialog = document.getElementById('postDialog');
+        const postDialogBox = document.getElementById('postDialogBox');
+        const cancelBtn = document.getElementById('cancelPostDialog');
+        const confirmBtn = document.getElementById('confirmPostDialog');
+        const form = document.getElementById('translationForm');
+        if (postBtn && postDialog && cancelBtn && confirmBtn && form) {
+          postBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('translation-action').value = 'post';
+            updateTargetChannelId();
+            postDialog.classList.remove('hidden');
+          });
+          cancelBtn.addEventListener('click', () => {
+            postDialog.classList.add('hidden');
+          });
+          confirmBtn.addEventListener('click', () => {
+            postDialog.classList.add('hidden');
+            document.getElementById('translation-action').value = 'post';
+            updateTargetChannelId();
+            showSpinner('Posting translation... Please wait.');
+            form.submit();
+          });
+          postDialog.addEventListener('mousedown', (e) => {
+            if (!postDialogBox.contains(e.target)) {
+              postDialog.classList.add('hidden');
+            }
+          });
+        }
+        // Show popup after posting
+        const postResult = '{{ post_result }}';
+        if (postResult && postResult !== 'None') {
+          const popup = document.createElement('div');
+          let channelText = '';
+          const sc = document.getElementById('source_channel');
+          if (sc) {
+            channelText = sc.options[sc.selectedIndex].textContent.trim();
+          }
+          popup.innerText = postResult + ' (Channel: ' + channelText + ')';
+          if (
+            postResult.toLowerCase().includes('fail') ||
+            postResult.toLowerCase().includes('error')
+          ) {
+            popup.className =
+              'fixed top-4 right-4 bg-red-200 text-red-800 p-4 rounded-lg shadow-lg z-50';
+          } else {
+            popup.className =
+              'fixed top-4 right-4 bg-green-200 text-green-800 p-4 rounded-lg shadow-lg z-50';
+          }
+          document.body.appendChild(popup);
+          const box = document.getElementById('postResultBox');
+          if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+      // Toggle Raw HTML display for both source and translation
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('toggleRawBtn');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          const srcRaw = document.getElementById('raw-html-source');
+          const srcBlock = document.getElementById('source-message-block');
+          const tgtRaw = document.getElementById('raw-html-content');
+          const tgtBlock = document.getElementById('translated-message-block');
+          if (!(srcRaw && srcBlock && tgtRaw && tgtBlock)) return;
+          const showRaw = srcRaw.style.display === 'none' && tgtRaw.style.display === 'none';
+          srcRaw.style.display    = showRaw ? 'block' : 'none';
+          srcBlock.style.display  = showRaw ? 'none'  : 'block';
+          tgtRaw.style.display    = showRaw ? 'block' : 'none';
+          tgtBlock.style.display  = showRaw ? 'none'  : 'block';
+        });
+      });
     </script>
   </body>
 </html>

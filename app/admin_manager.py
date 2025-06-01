@@ -247,6 +247,7 @@ def channel_translate():
                 translation_result = asyncio.run(
                     translate_html(anthropic_client, payload)
                 )
+                print(f"[TRANSLATE] Translation result: {translation_result[:400]}")
                 import re
                 translation_result = re.sub(r'(</[a-z]+>)+$', '', translation_result)
                 print(f"[TRANSLATE] Translation result: {translation_result[:400]}")
