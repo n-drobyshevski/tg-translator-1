@@ -5,7 +5,7 @@ from translator.config import STATS_PATH, DEFAULT_STATS
 
 admin_stats_bp = Blueprint("admin_stats_bp", __name__)
 
-@admin_stats_bp.route("/admin/stats", methods=["GET"])
+@admin_stats_bp.route("/admin/events", methods=["GET"])
 @login_required
 def admin_stats():
     try:
@@ -15,7 +15,7 @@ def admin_stats():
         stats = DEFAULT_STATS.copy()
     return render_template("admin_stats.html", stats=stats)
 
-@admin_stats_bp.route("/admin/stats/detail", methods=["GET"])
+@admin_stats_bp.route("/admin/events/detail", methods=["GET"])
 @login_required
 def admin_stats_detail():
     try:

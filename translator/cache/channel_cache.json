@@ -1,4 +1,38 @@
 {
+  "-1001111111111": [
+    {
+      "message_id": 1001,
+      "date": "2025-06-01T09:15:00",
+      "chat_title": "news_world",
+      "chat_username": "newsworldch",
+      "html": "<b>Breaking: New Discovery on Mars</b>\n\nScientists have found traces of water beneath the Martian surface. This finding could indicate the potential for life or future human habitats.\n\n#mars #space #science"
+    },
+    {
+      "message_id": 1002,
+      "date": "2025-06-01T11:30:00",
+      "chat_title": "news_world",
+      "chat_username": "newsworldch",
+      "html": "<b>Earthquake Shakes Tokyo</b>\n\nA magnitude 6.2 earthquake struck Tokyo this morning. No major damages reported, but aftershocks are expected.\n\n#earthquake #tokyo"
+    }
+  ],
+  "-1002222222222": [
+    {
+      "message_id": 2001,
+      "date": "2025-06-01T12:00:00",
+      "chat_title": "tech_updates",
+      "chat_username": "techupdatesch",
+      "html": "<b>AI Model Surpasses Human Performance</b>\n\nA new AI model has achieved unprecedented results on standard benchmarks, outperforming human experts in some tasks.\n\n#ai #technology"
+    },
+    {
+      "message_id": 2003,
+      "date": "2025-06-01T14:05:00",
+      "chat_title": "tech_updates",
+      "chat_username": "techupdatesch",
+      "html": "<b>Translation of: Новое открытие на Марсе</b>\n\nScientists have found traces of water beneath the Martian surface, according to <a href=\"https://t.me/newsworldch/1001\">news_world</a>.\n\n#mars #space",
+      "source_channel_id": "-1001111111111",
+      "source_message_id": 1001
+    }
+  ],
   "-1002657093374": [
     {
       "message_id": 279,

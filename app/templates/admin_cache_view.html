@@ -1,166 +1,226 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Channel Cache Viewer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
-    <style>
-      body {
-        font-family: 'Roboto', sans-serif;
-      }
-    </style>
+  <meta charset="UTF-8">
+  <title>Channel Cache Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome for sort icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- List.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/2.3.1/list.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto mt-8">
-        <div class="flex items-center mb-6">
-            {% set href = '/admin' %}
-            {% include 'components/back_button.html' %}
-            <h1 class="text-3xl font-bold mt-[-5px]" >Channel Cache</h1>
-        </div>
-        <hr class="mb-6">
-        <form class="mb-6" method="get">
-            <div class="flex items-center gap-2">
-                <label for="channel_filter" class="font-medium">Filter by Channel:</label>
-                <select id="channel_filter" name="channel" class="border rounded px-3 py-2" onchange="this.form.submit()">
-                    <option value="">All Channels</option>
-                    {% for cid, cname in channel_id_to_name.items() %}
-                        <option value="{{ cid }}" {% if request.args.get('channel') == cid %}selected{% endif %}>{{ cname }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </form>
-        {% if error %}
-            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{{ error }}</div>
-        {% endif %}
-        {% if cache_data %}
+  <div class="container mx-auto mt-8" id="cache-table-app">
+    <div class="flex items-center mb-6">
+      {% set href = '/admin' %}
+      {% include 'components/back_button.html' %}
+      <h1 class="text-3xl font-bold mt-[-5px]">Channel Cache</h1>
+    </div>
+    <hr class="mb-6">
+
+    <div class="bg-white p-4 rounded shadow mb-6 flex flex-wrap gap-4 items-end">
+      <div>
+        <label for="channel_filter" class="font-medium block text-sm mb-1">Filter by Channel</label>
+        <select id="channel_filter" name="channel" class="border rounded px-3 py-2 min-w-[180px]">
+          <option value="">All Channels</option>
+          {% for cid, cname in channel_id_to_name.items() %}
+            <option value="{{ cid }}" {% if request.args.get('channel') == cid %}selected{% endif %}>{{ cname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex-1">
+        <label for="searchQuery" class="font-medium block text-sm mb-1">Search</label>
+        <input type="text" id="searchQuery" class="search block w-full border border-gray-300 rounded px-3 py-2" placeholder="Search messages...">
+      </div>
+    </div>
+
+    {% if error %}
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{{ error }}</div>
+    {% endif %}
+
+    {% if cache_data %}
+      <div class="overflow-x-auto bg-white rounded shadow">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sort" data-sort="channel_name">
+                <span class="inline-flex items-center gap-1">
+                  Channel
+                  <i class="fas fa-sort text-gray-400"></i>
+                </span>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sort" data-sort="message_id">
+                <span class="inline-flex items-center gap-1">
+                  Message ID
+                  <i class="fas fa-sort text-gray-400"></i>
+                </span>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sort" data-sort="date_formatted">
+                <span class="inline-flex items-center gap-1">
+                  Time
+                  <i class="fas fa-sort text-gray-400"></i>
+                </span>
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Source
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="cacheTbody" class="list bg-white divide-y divide-gray-200">
             {% set selected_channel = request.args.get('channel') %}
             {% for channel_id, messages in cache_data.items() %}
-                {% if not selected_channel or selected_channel == channel_id %}
-                <div class="bg-white rounded shadow mb-8">
-                    <div class="px-4 py-2 border-b flex flex-wrap items-center justify-between">
-                        <div class="flex flex-wrap items-center gap-4">
-                            <span class="text-xl font-semibold text-gray-800">
-                                {{ channel_id_to_name.get(channel_id, "Unknown") }}
-                            </span>
-                            <span class="text-sm text-gray-500 mt-[3px]">
-                                <b>ID:</b> {{ channel_id }}
-                            </span>
+              {% if not selected_channel or selected_channel == channel_id %}
+                {% for msg in messages %}
+                  <tr id="source-{{ channel_id }}-{{ msg.message_id }}">
+                    <td class="px-4 py-3 channel_name font-semibold text-blue-800">{{ channel_id_to_name.get(channel_id, "Unknown") }}</td>
+                    <td class="px-4 py-3 message_id font-mono">{{ msg.message_id }}</td>
+                    <td class="px-4 py-3 date_formatted text-xs text-gray-700">{{ msg.date_formatted }}</td>
+                    <td class="px-4 py-3">
+                      {% if msg.source_channel_id %}
+                        {% set source_card = cache_data[msg.source_channel_id|string] if cache_data[msg.source_channel_id|string] is defined else None %}
+                        {% if source_card %}
+                          <button type="button"
+                            class="text-blue-600 hover:underline bg-transparent px-0 py-0 border-none transition-colors duration-200 go-to-source-link"
+                            data-target="source-{{ msg.source_channel_id }}-{{ msg.source_message_id }}">
+                            from : {{ msg.source_channel_id }} | {{ msg.source_message_id }}
+                          </button>
+                        {% else %}
+                          from : {{ msg.source_channel_id }} | {{ msg.source_message_id }}
+                        {% endif %}
+                      {% else %}
+                        &mdash;
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-3 align-top">
+                      <div class="message-preview bg-transparent font-mono text-sm leading-snug text-gray-800 relative transition-all duration-300 overflow-x-auto p-0" style="max-height:7em;">
+                        <div class="message-content" style="white-space: pre-line; overflow:hidden; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;">
+                          {{ msg.html | safe }}
                         </div>
-                    </div>
-                    <ul>
-                        {% for msg in messages %}
-                        <li class="border-b last:border-b-0" id="source-{{ channel_id }}-{{ msg.message_id }}">
-                            <div class="px-4 py-3 card-content">
-                                <div class="mb-2 text-sm text-gray-500">
-                                    <span><b>Message ID:</b> {{ msg.message_id }}</span>
-                                    <span class="ml-4"><b>Time:</b> {{ msg.date_formatted }}</span>
-                                </div>
-                                {% if msg.source_channel_id %}
-                                <div class="mb-2 text-sm text-gray-500">
-                                    {% set source_card = cache_data[msg.source_channel_id|string] if cache_data[msg.source_channel_id|string] is defined else None %}
-                                    {% if source_card %}
-                                        <button type="button"
-                                            class="text-blue-600 hover:underline bg-transparent px-0 py-0 border-none transition-colors duration-200 go-to-source-link"
-                                            data-target="source-{{ msg.source_channel_id }}-{{ msg.source_message_id }}">
-                                            Translated from : {{ msg.source_channel_id }} | {{ msg.source_message_id }}
-                                        </button>
-                                    {% else %}
-                                        translated from : Channel "{{ msg.source_channel_id }}" ; message {{ msg.source_message_id }}
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                                <div class="mt-2">
-                                    <div class="border-l-4 border-blue-200 bg-gray-50 rounded p-3 text-sm text-gray-800 mt-1 overflow-hidden transition-all duration-300 message-preview" style="max-height:8.5em;">
-                                        <div class="message-content" style="white-space: pre-line;">
-                                            {{ msg.html | safe }}
-                                        </div>
-                                    </div>
-                                    <div class="flex justify-center mt-2">
-                                        <button type="button"
-                                            class="px-2 py-1 text-blue-600 hover:underline focus:outline-none"
-                                            onclick="toggleCard(this)">
-                                            <span class="show-more-label">Show more</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-center align-top">
+                      <button type="button"
+                        class="px-2 py-1 text-blue-600 hover:underline focus:outline-none show-modal-btn"
+                        data-message='{{ msg | tojson | safe }}'
+                        data-channel="{{ channel_id_to_name.get(channel_id, "Unknown") }}"
+                        data-channelid="{{ channel_id }}">
+                        More
+                      </button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% endif %}
             {% endfor %}
-        {% else %}
-            <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">No cache data found.</div>
-        {% endif %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">No cache data found.</div>
+    {% endif %}
+  </div>
+
+<!-- Modal -->
+<dialog id="msgModal" class="rounded-lg shadow-lg w-full max-w-4xl">
+  <form method="dialog" class="bg-white rounded-lg max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center border-b px-6 py-3">
+      <h5 class="text-xl font-semibold">Message Details</h5>
+      <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl font-bold" onclick="document.getElementById('msgModal').close()">&times;</button>
     </div>
-</body>
-</html>
+    <div class="px-8 py-6" id="msgModalBody">
+      <!-- Filled by JS -->
+    </div>
+    <div class="flex justify-end gap-2 border-t px-6 py-3">
+      <button type="button" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition" onclick="document.getElementById('msgModal').close()">Close</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
-function toggleCard(btn) {
-    const preview = btn.closest('.px-4.py-3').querySelector('.message-preview');
-    const label = btn.querySelector('.show-more-label');
-    if (preview.classList.contains('expanded')) {
-        preview.classList.remove('expanded');
-        preview.style.maxHeight = '8.5em';
-        label.textContent = 'Show more';
-    } else {
-        preview.classList.add('expanded');
-        preview.style.maxHeight = '1000px';
-        label.textContent = 'Show less';
-    }
-}
-
-// Highlight card when navigated via anchor or Go to source
 function highlightCardById(id) {
-    const el = document.getElementById(id);
-    if (el) {
-        const card = el.querySelector('.card-content');
-        if (card) {
-            card.classList.add('ring-4', 'ring-blue-400', 'transition');
-            setTimeout(() => {
-                card.classList.remove('ring-4', 'ring-blue-400');
-            }, 1500);
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    }
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('ring-4', 'ring-blue-400', 'transition');
+    setTimeout(() => {
+      el.classList.remove('ring-4', 'ring-blue-400');
+    }, 1500);
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 }
-
 function highlightCardFromHash() {
-    if (window.location.hash.startsWith("#source-")) {
-        highlightCardById(window.location.hash.substring(1));
-    }
+  if (window.location.hash.startsWith("#source-")) {
+    highlightCardById(window.location.hash.substring(1));
+  }
 }
-window.addEventListener('DOMContentLoaded', highlightCardFromHash);
-window.addEventListener('hashchange', highlightCardFromHash);
+window.addEventListener('DOMContentLoaded', function() {
+  highlightCardFromHash();
+  window.addEventListener('hashchange', highlightCardFromHash);
 
-// Make Go to source links reusable
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.go-to-source-link').forEach(function(link) {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = link.getAttribute('data-target');
-            highlightCardById(targetId);
-            // Optionally update the hash in the URL
-            history.replaceState(null, '', '#' + targetId);
-        });
+  document.querySelectorAll('.go-to-source-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      const targetId = link.getAttribute('data-target');
+      highlightCardById(targetId);
+      history.replaceState(null, '', '#' + targetId);
     });
+  });
+
+  // List.js sorting & search
+  if (document.querySelector('#cacheTbody')) {
+    var options = {
+      valueNames: ['channel_name', 'message_id', 'date_formatted', 'message-content']
+    };
+    var cacheList = new List('cache-table-app', options);
+
+    document.getElementById('channel_filter').addEventListener('change', function () {
+      const cid = this.value;
+      window.location.search = cid ? ('?channel=' + encodeURIComponent(cid)) : '';
+    });
+  }
+  // Search sync
+  document.getElementById('searchQuery')?.addEventListener('input', function(e){
+    // List.js will react automatically via class="search"
+  });
+
+  // Modal show
+  document.querySelectorAll('.show-modal-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      let msg = {};
+      try { msg = JSON.parse(btn.getAttribute('data-message')); } catch(e) {}
+      const modal = document.getElementById('msgModal');
+      const body = document.getElementById('msgModalBody');
+      let details = `
+        <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+          <div class="text-sm text-gray-700"><b>Channel:</b> ${btn.getAttribute('data-channel')} <span class="text-xs text-gray-400 ml-2">${btn.getAttribute('data-channelid')}</span></div>
+          <div class="text-sm text-gray-700"><b>Message ID:</b> ${msg.message_id || ''}</div>
+          <div class="text-sm text-gray-700"><b>Date:</b> ${msg.date_formatted || ''}</div>
+          ${msg.source_channel_id ? `<div class="text-sm text-gray-700"><b>Source:</b> ${msg.source_channel_id} | ${msg.source_message_id}</div>` : ''}
+        </div>
+        <div class="mb-2 mt-4"><b>Full Message:</b></div>
+        <div class="whitespace-pre-wrap bg-slate-100 border border-slate-200 rounded-lg p-4 font-mono text-gray-800 text-base overflow-x-auto max-h-[450px]">${msg.html || ''}</div>
+      `;
+      body.innerHTML = details;
+      modal.showModal();
+    });
+  });
 });
 </script>
 <style>
 .message-preview {
-    /* Show only first 7 lines by default */
     display: -webkit-box;
-    -webkit-line-clamp: 7;
+    -webkit-line-clamp: 6;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    max-height: 11.9em;
+    max-height: 7em;
     transition: max-height 0.3s;
-}
-.message-preview.expanded {
-    -webkit-line-clamp: unset;
-    max-height: 1000px;
-    overflow: visible;
+    position: relative;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 </style>
+</body>
+</html>

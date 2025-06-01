@@ -33,21 +33,21 @@
         <p class="text-gray-500 text-sm mt-4">Edit the prompt template above and click "Save Template" to update the translation prompt.</p>
       </div>
       <!-- Confirmation Modal -->
-      <div id="confirmSaveModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg w-full max-w-md">
+      <dialog id="confirmSaveModal" class="rounded-lg shadow-lg w-full max-w-md">
+        <form method="dialog" class="bg-white rounded-lg">
           <div class="flex justify-between items-center border-b px-4 py-2">
             <h5 class="text-lg font-semibold">Confirm Save</h5>
-            <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl font-bold" onclick="document.getElementById('confirmSaveModal').classList.add('hidden')">&times;</button>
+            <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl font-bold" onclick="document.getElementById('confirmSaveModal').close()">&times;</button>
           </div>
           <div class="px-4 py-4">
             Are you sure you want to save the template?
           </div>
           <div class="flex justify-end gap-2 border-t px-4 py-2">
-            <button type="button" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition" onclick="document.getElementById('confirmSaveModal').classList.add('hidden')">Cancel</button>
+            <button type="button" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition" onclick="document.getElementById('confirmSaveModal').close()">Cancel</button>
             <button type="button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition" id="confirm_save_btn">Confirm</button>
           </div>
-        </div>
-      </div>
+        </form>
+      </dialog>
       <!-- Toast for success pop up -->
       <div id="successToast" class="fixed top-5 right-5 z-50 hidden bg-green-500 text-white px-4 py-2 rounded shadow">
         Template saved successfully. Please reload the task for changes to take effect.
@@ -118,12 +118,12 @@
 
       // Show confirmation modal when Save Template is clicked
       document.getElementById('save_template_btn').addEventListener('click', function(){
-        document.getElementById('confirmSaveModal').classList.remove('hidden');
+        document.getElementById('confirmSaveModal').showModal();
       });
 
       // On confirm in modal, perform AJAX call to save the prompt
       document.getElementById('confirm_save_btn').addEventListener('click', function(){
-        document.getElementById('confirmSaveModal').classList.add('hidden');
+        document.getElementById('confirmSaveModal').close();
         var formData = new FormData(document.getElementById('save_form'));
         fetch('/admin/save_prompt', {
           method: 'POST',

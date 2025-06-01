@@ -119,3 +119,13 @@ def update_cache():
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@admin_cache_bp.route("/admin/cache/json", methods=["GET"])
+@login_required
+def get_cache_json():
+    cache_path = os.path.join(CACHE_DIR, "channel_cache.json")
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
+            return jsonify(json.load(f))
+    return jsonify({})
