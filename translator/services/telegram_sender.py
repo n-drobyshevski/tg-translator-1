@@ -73,10 +73,10 @@ class TelegramSender:
         cfg = self.configs.get(target)
         if not cfg:
             logging.error("Unknown channel type: %s", target)
-            return False, None
+            return False, None, None, "Unknown channel type"
         if not cfg.channel_id:
             logging.error("No channel_id for %s", target)
-            return False, None
+            return False, None, None, "No channel_id for target"
 
         url = f"https://api.telegram.org/bot{cfg.bot_token}/sendMessage"
         chunks = self.split_message(text)
@@ -114,7 +114,14 @@ class TelegramSender:
             source_channel = str(meta.get("source_channel_id", ""))
 
         for chunk in chunks:
-            sanitized_chunk = chunk.replace("<p>", "").replace("</p>", "")
+            # Remove unsupported tags for Telegram HTML (e.g., <br>)
+            sanitized_chunk = (
+                chunk.replace("<p>", "")
+                .replace("</p>", "")
+                .replace("<br>", "\n")
+                .replace("<br/>", "\n")
+                .replace("<br />", "\n")
+            )
             logging.info(
                 "Sending chunk to %s (chat_id %s)…", target, cfg.channel_id
             )
@@ -134,7 +141,7 @@ class TelegramSender:
                     api_error_code = r.status_code
                     exception_message = desc
                     posting_success = False
-                    return False, None
+                    return False, None, api_error_code, exception_message
                 result = r.json().get("result", {})
                 sent_msg_id = result.get("message_id")
                 sent_chat_id = result.get("chat", {}).get("id")
@@ -143,7 +150,7 @@ class TelegramSender:
                 logging.error("Error sending to %s: %s", cfg.channel_id, e)
                 posting_success = False
                 exception_message = str(e)
-                return False, None
+                return False, None, None, exception_message
 
         logging.info("Successfully sent %d chunk(s) to %s", len(chunks), target)
         print(text)
@@ -172,7 +179,7 @@ class TelegramSender:
                 }
                 store_message(sent_chat_id, dest_msg_data)
 
-        return posting_success, sent_chat_id
+        return posting_success, sent_chat_id, None, None
 
     def edit_message(
         self,
@@ -195,7 +202,7 @@ class TelegramSender:
     ):
         """
         Edit a message in a Telegram channel by channel_id and message_id.
-        Returns True if successful, False otherwise.
+        Returns (posting_success, api_error_code, exception_message).
         """
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
@@ -207,22 +214,24 @@ class TelegramSender:
             "parse_mode": "HTML"
         }
         posting_success = False
+        api_error_code = None
+        exception_message = None
         try:
             resp = _SESSION.post(url, data=payload, timeout=10)
             if resp.status_code == 200 and resp.json().get("ok"):
                 posting_success = True
                 # No record_event here
-                return True
+                return posting_success, None, None
             else:
                 logging.error("Failed to edit message %s in %s: %s", message_id, channel_id, resp.text)
                 posting_success = False
                 api_error_code = resp.status_code
                 exception_message = resp.text
                 # No record_event here
-                return False
+                return posting_success, api_error_code, exception_message
         except Exception as e:
             logging.error("Exception editing message %s in %s: %s", message_id, channel_id, e)
             posting_success = False
             exception_message = str(e)
             # No record_event here
-            return False
+            return posting_success, None, exception_message

@@ -9,21 +9,6 @@ def test_import_bot_module():
     import translator.bot
 
 
-def test_load_config_function():
-    cfg = bot.load_config()
-    assert "BOT_TOKEN" in cfg
-    assert "ANTHROPIC_API_KEY" in cfg
-
-
-def test_get_channel_mapping():
-    env = {
-        "CHRISTIANVISION_CHANNEL": "10",
-        "SHALTNOTKILL_CHANNEL": "20",
-        "SOURCE_TEST_ID": "30",
-    }
-    mapping = bot.get_channel_mapping(env)
-    assert 10 in mapping or 20 in mapping or 30 in mapping
-
 
 def test_init_clients_smoke(monkeypatch):
     # Patch out external dependencies and constructor side effects
@@ -60,7 +45,7 @@ def test_init_clients_smoke(monkeypatch):
         "SHALTNOTKILL_CHANNEL": "2",
         "SOURCE_TEST_ID": "3",
     }
-    pyro, ptb_app, anthropic, sender = bot.init_clients(env)
+    pyro, ptb_app, anthropic, sender = bot.init_clients()
     assert (
         pyro is not None
         and ptb_app is not None

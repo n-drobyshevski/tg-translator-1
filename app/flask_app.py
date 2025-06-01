@@ -17,6 +17,7 @@ from admin_config import admin_config_bp
 from admin_manager import admin_manager_bp
 from admin_cache import admin_cache_bp
 from app.admin_events import admin_stats_bp
+from admin_logs import admin_logs_bp
 from aggregator import (
     build_summary,
     build_10d_channels,
@@ -110,6 +111,7 @@ app.register_blueprint(admin_config_bp)  # add this
 app.register_blueprint(admin_manager_bp)  # renamed blueprint
 app.register_blueprint(admin_cache_bp)  # register cache blueprint
 app.register_blueprint(admin_stats_bp)  # register stats blueprint
+app.register_blueprint(admin_logs_bp)
 app.register_blueprint(bp)
 
 @app.route("/")

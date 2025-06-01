@@ -13,21 +13,22 @@ from __future__ import annotations
 
 import os
 import sys
+import logging
 # ensure project root is on PYTHONPATH when running this file directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 import asyncio
 import html
-import logging
 import requests
 import signal
 import time
+import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from anthropic import Anthropic
-from translator.config import CONFIG, PROMPT_TEMPLATE_PATH, load_prompt_template
+from translator.config import CONFIG, PROMPT_TEMPLATE_PATH, load_prompt_template, CACHE_DIR
 from translator.models import MetadataRequest, MessageEvent
 
 from pyrogram import filters
@@ -65,13 +66,46 @@ query_queue = asyncio.Queue()
 # Logging
 ###############################################################################
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s — %(levelname)s — %(name)s — %(message)s",
-)
+
+# Ensure cache directory exists for logs
+os.makedirs(CACHE_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(CACHE_DIR, "bot.log")
+
+try:
+    # Set up file logging
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        format="%(asctime)s — %(levelname)s — %(name)s — %(message)s",
+        filename=LOG_FILE_PATH,   # Log file path in cache/
+        filemode="a",             # Append mode
+        encoding="utf-8"          # Ensure UTF-8 output
+    )
+except OSError as e:
+    print(f"WARNING: Could not write to log file {LOG_FILE_PATH}: {e}")
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        format="%(asctime)s — %(levelname)s — %(name)s — %(message)s"
+    )
+
+# Set up console logging (StreamHandler)
+console = logging.StreamHandler()
+console.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+formatter = logging.Formatter("%(asctime)s — %(levelname)s — %(name)s — %(message)s")
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
+
 logger = logging.getLogger("MAIN")
 pyro_log = logging.getLogger("PYRO")
 ptb_log = logging.getLogger("PTB")
+
+# Add a runtime check for log file writability and log to console if not writable
+try:
+    with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+        pass
+except OSError as e:
+    logger = logging.getLogger()
+    logger.error("OSError: write error to log file %s: %s. Logging to console only.", LOG_FILE_PATH, e)
+
 
 ###############################################################################
 # PTB‑worker (метаданные вложений)
@@ -164,7 +198,8 @@ def register_handlers(
 
         payload = build_payload(msg, html_text, meta)
         msg_id = log_and_store_message(msg, html_text)
-        pyro_log.info("Payload data: %s", payload)
+        import json
+        pyro_log.info("Payload data: %s", json.dumps(payload, ensure_ascii=False, indent=2, default=str))
         pyro_log.info("Logged message id: %s", msg_id)
         translation_start = time.monotonic()
         retry_count = 0
@@ -198,7 +233,7 @@ def register_handlers(
                 "source_html": html_text,
             }
             post_start = time.monotonic()
-            posting_success, dest_channel_id_actual = await run_with_retries(
+            posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(
                 sender.send_message, translated, target, cache_meta
             )
             dest_channel_id_to_log = (
@@ -276,6 +311,19 @@ def register_handlers(
 ###############################################################################
 async def main_async():
     logger.info("=== BOT STARTUP ===")
+    # --- Session lock check ---
+    session_file = "bot.session"
+    if os.path.exists(session_file):
+        try:
+            conn = sqlite3.connect(session_file)
+            conn.execute("PRAGMA quick_check")
+            conn.close()
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e):
+                logger.error("Session file %s is locked. Stop all bots and delete this file before restarting.", session_file)
+                raise
+    # --- end session lock check ---
+
     pyro, ptb_app, anthropic, sender = init_clients()
     mapping = get_channel_mapping()
 

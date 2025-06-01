@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bot Logs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { font-family: 'Roboto', Arial, sans-serif; }
+      .log-container { background: #18181b; color: #e5e7eb; border-radius: 8px; padding: 1.5rem; font-size: 0.95em; }
+      .log-line { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto mt-8 px-4">
+      <div class="flex items-center mb-6">
+        {% set href = '/admin' %}
+        {% include 'components/back_button.html' %}
+        <h1 class="text-2xl font-bold ml-2">Bot Logs</h1>
+        <form method="post" action="{{ url_for('admin_logs_bp.clear_logs') }}" class="ml-auto">
+          <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow transition">
+            Clear Log
+          </button>
+        </form>
+      </div>
+      <div class="log-container shadow-lg">
+        {% for line in log_lines %}
+          <div class="log-line">{{ line.rstrip() }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </body>
+</html>
