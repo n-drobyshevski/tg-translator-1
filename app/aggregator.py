@@ -145,6 +145,7 @@ def build_throughput_latency(messages):
             "x": m.get("original_size", 0),
             "y": m.get("translation_time", 0),
             "label": m.get("source_channel_name", "") or m.get("source_channel", ""),
+            "id": m.get("message_id"),  # <-- Add message_id for tooltip
         }
         for m in messages
         if m.get("original_size") is not None and m.get("translation_time") is not None

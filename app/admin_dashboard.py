@@ -17,10 +17,15 @@ def compute_stats(messages):
     total_posts = sum(1 for m in messages if m.get("posting_success") is not None)
     success_count = sum(1 for m in messages if m.get("posting_success") is True)
     fail_count = total_posts - success_count
+    # Count errors: posting_success is False or api_error_code or exception_message present
+    error_count = sum(
+        1 for m in messages
+        if m.get("posting_success") is False or m.get("api_error_code") is not None or m.get("exception_message")
+    )
     success_rate = round(100 * success_count / total_posts, 1) if total_posts > 0 else 0
     logger.debug(
-        "compute_stats: total_posts=%d, success_count=%d, fail_count=%d, success_rate=%.1f",
-        total_posts, success_count, fail_count, success_rate
+        "compute_stats: total_posts=%d, success_count=%d, fail_count=%d, error_count=%d, success_rate=%.1f",
+        total_posts, success_count, fail_count, error_count, success_rate
     )
     # Avg latency
     latencies = [m.get("translation_time", 0) for m in messages if m.get("translation_time") is not None]
@@ -52,6 +57,7 @@ def compute_stats(messages):
         "total_posts": total_posts,
         "successful_posts": success_count,
         "failed_posts":  fail_count,
+        "error_count":   error_count,
         "success_rate":   success_rate,
         "avg_latency":    avg_latency,
         "latest_timestamp": latest,
@@ -83,6 +89,7 @@ def admin_dashboard():
             "total_posts": 0,
             "successful_posts": 0,
             "failed_posts": 0,
+            "error_count": 0,
             "success_rate": 0,
             "avg_latency": 0,
             "latest_timestamp": "-",

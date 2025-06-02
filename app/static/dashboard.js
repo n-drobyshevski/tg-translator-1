@@ -160,7 +160,8 @@ function getColor(i) {
 /* Fetch summary JSON and feed the charts */
 async function loadMetrics() {
   try {
-    const res = await fetch("/api/metrics/summary");
+    const includeTest = getIncludeTestChannels();
+    const res = await fetch(`/api/metrics/summary?include_test_channels=${includeTest ? "1" : "0"}`);
     if (!res.ok) throw new Error(res.statusText);
     const json = await res.json();
     console.log(json);
@@ -191,6 +192,18 @@ ready(() => {
   }
   loadMetrics();
   //   setInterval(loadMetrics, 30_000); // refresh every 30 s
+
+  // Listen for test channel checkbox changes
+  const cb = document.getElementById("include_test_channels");
+  if (cb) {
+    cb.addEventListener("change", () => {
+      loadMetrics();
+      const slider = document.getElementById("timeRangeDays");
+      if (slider) {
+        loadPostsPerChannelChart(parseInt(slider.value, 10));
+      }
+    });
+  }
 });
 
 function customTooltipHeatmap(context) {
@@ -240,8 +253,25 @@ function customTooltipHeatmap(context) {
     const { offsetLeft: posX, offsetTop: posY } = tooltip.chart.canvas;
     tooltipEl.innerHTML = content;
     tooltipEl.style.opacity = 1;
-    tooltipEl.style.left = `${posX + tooltip.caretX + 14}px`;
-    tooltipEl.style.top = `${posY + tooltip.caretY + 14}px`;
+
+    // --- Begin: prevent right overflow ---
+    // Default position: right of cursor
+    let left = posX + tooltip.caretX + 14;
+    let top = posY + tooltip.caretY + 14;
+    // Temporarily set visibility to get width
+    tooltipEl.style.left = '0px';
+    tooltipEl.style.top = '-9999px';
+    tooltipEl.style.display = 'block';
+    const tooltipRect = tooltipEl.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    // If would overflow right, show to the left of cursor
+    if (left + tooltipRect.width > viewportWidth - 8) {
+      left = posX + tooltip.caretX - tooltipRect.width - 14;
+      if (left < 0) left = 8; // Clamp to left edge
+    }
+    tooltipEl.style.left = `${left}px`;
+    tooltipEl.style.top = `${top}px`;
+    // --- End: prevent right overflow ---
   }
   
 
@@ -263,25 +293,51 @@ function customTooltip(context) {
   let content = "";
   if (tooltip.dataPoints && tooltip.dataPoints.length > 0) {
     const dp = tooltip.dataPoints[0];
-    // Label: day, channel, etc. Value: count
-    // Try to support both line and bar configs
-    let label = dp.label || dp.parsed.x || dp.parsed.y;
-    let value = dp.formattedValue || (dp.raw && dp.raw.v) || dp.raw || "";
-    // Remove any HTML from label just in case
-    label = String(label).replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    content += `
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b>${label}</b> <b>${value}</b>
-      </div>
-    `;
+    // For scatter plot (Throughput vs. Latency), show channel, original size, translation time, and message id
+    if (context.chart.config.type === "scatter" && dp.raw) {
+      const channel = dp.raw.label || "";
+      const origSize = dp.raw.x;
+      const latency = dp.raw.y;
+      const latencyFormatted = latency.toFixed(3);
+      const msgId = dp.raw.id !== undefined ? dp.raw.id : "";
+      content += `
+        <div><strong>Channel:</strong> ${channel}</div>
+        <div><strong>Original size:</strong> ${origSize} chars</div>
+        <div><strong>Translation time:</strong> ${latencyFormatted} s</div>
+        <div><strong>Message ID:</strong> ${msgId}</div>
+      `;
+    } else {
+      // Label: day, channel, etc. Value: count
+      let label = dp.label || dp.parsed.x || dp.parsed.y;
+      let value = dp.formattedValue || (dp.raw && dp.raw.v) || dp.raw || "";
+      label = String(label).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      content += `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b>${label}</b> <b>${value}</b>
+        </div>
+      `;
+    }
   }
 
   const { offsetLeft: posX, offsetTop: posY } = tooltip.chart.canvas;
   tooltipEl.innerHTML = content;
   tooltipEl.style.opacity = 1;
-  tooltipEl.style.left = `${posX + tooltip.caretX + 14}px`;
-  tooltipEl.style.top = `${posY + tooltip.caretY + 14}px`;
+
+  // --- Begin: prevent right overflow ---
+  let left = posX + tooltip.caretX + 14;
+  let top = posY + tooltip.caretY + 14;
+  tooltipEl.style.left = '0px';
+  tooltipEl.style.top = '-9999px';
+  tooltipEl.style.display = 'block';
+  const tooltipRect = tooltipEl.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+  if (left + tooltipRect.width > viewportWidth - 8) {
+    left = posX + tooltip.caretX - tooltipRect.width - 14;
+    if (left < 0) left = 8;
+  }
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top}px`;
+  // --- End: prevent right overflow ---
 }
 
 // SLIDER ________________________
@@ -323,13 +379,19 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 async function loadPostsPerChannelChart(days) {
   try {
-    const res = await fetch(`/api/metrics/summary?days=${days}`);
+    const includeTest = getIncludeTestChannels();
+    const res = await fetch(`/api/metrics/summary?days=${days}&include_test_channels=${includeTest ? "1" : "0"}`);
     if (!res.ok) throw new Error(res.statusText);
     const json = await res.json();
     if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
   } catch (err) {
     console.error("Posts per Channel fetch failed:", err);
   }
+}
+// Helper to get checkbox state
+function getIncludeTestChannels() {
+  const cb = document.getElementById("include_test_channels");
+  return cb ? cb.checked : true;
 }
 function drawThroughputLatency({ points }) {
   const ctx = document.getElementById("chartThroughputLatency");
@@ -362,14 +424,8 @@ function drawThroughputLatency({ points }) {
       },
       plugins: {
         tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const d = ctx.raw;
-              return `Size: ${d.x}, Latency: ${d.y.toFixed(2)}s, Channel: ${
-                d.label
-              }`;
-            },
-          },
+          enabled: false,
+          external: customTooltip, // Use customTooltip for this chart
         },
         legend: { display: false },
       },

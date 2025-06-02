@@ -93,6 +93,22 @@ def metrics_summary():
         messages = load_messages()
         # Get the days parameter, default to 10 if not provided
         days = int(request.args.get("days", 10))
+        include_test = request.args.get("include_test_channels", "1") not in ("0", "false", "False")
+        # Filter out test channels if needed
+        if not include_test:
+            test_ids = set()
+            for envvar in ("SOURCE_TEST_ID", "TARGET_CHANNEL_ID"):
+                val = os.getenv(envvar)
+                if val:
+                    test_ids.add(str(val))
+            def not_test(m):
+                return (
+                    str(m.get("source_channel")) not in test_ids and
+                    str(m.get("dest_channel")) not in test_ids and
+                    str(m.get("source_channel_name", "")).lower() != "test" and
+                    str(m.get("dest_channel_name", "")).lower() != "test"
+                )
+            messages = [m for m in messages if not_test(m)]
         payload = {
             "posts_10d": build_summary(messages, days),
             "posts_10d_channels": build_10d_channels(messages, days),
