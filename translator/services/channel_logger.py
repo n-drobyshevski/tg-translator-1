@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 from typing import List, Dict, Any, Optional
+from html import escape
 from pyrogram.errors import MessageIdInvalid
 from translator.config import CACHE_DIR, STORE_PATH, MESSAGES_LIMIT
 
@@ -38,8 +39,10 @@ class ChannelCache:
         # Ensure presence of chat_title and chat_username
         message_data.setdefault("chat_title", "")
         message_data.setdefault("chat_username", "")
-        if "html" not in message_data:
-            message_data["html"] = message_data.get("text", "")
+        # sanitize html before storing
+        raw = message_data.get("html", "")
+        safe_html = escape(raw)  # now all <,>,& etc. are escaped
+        message_data["html"] = safe_html
         message_data.pop("entities", None)
         if channel_id not in self.cache:
             self.cache[channel_id] = []

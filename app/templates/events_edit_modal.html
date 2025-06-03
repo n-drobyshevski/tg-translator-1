@@ -1,0 +1,301 @@
+{% set body %}
+  <div class="max-h-[70vh] overflow-y-auto px-6 py-4">
+    <form id="edit-event-form" class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Timestamp -->
+      <div class="flex flex-col">
+        <label for="field-timestamp" class="block text-sm font-medium text-gray-700">
+          Timestamp
+        </label>
+        <input
+          type="datetime-local"
+          id="field-timestamp"
+          name="timestamp"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Event -->
+      <div class="flex flex-col">
+        <label for="field-event" class="block text-sm font-medium text-gray-700">
+          Event
+        </label>
+        <input
+          type="text"
+          id="field-event"
+          name="event"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Edit Timestamp -->
+      <div class="flex flex-col">
+        <label for="field-edit_timestamp" class="block text-sm font-medium text-gray-700">
+          Edit Time
+        </label>
+        <input
+          type="datetime-local"
+          id="field-edit_timestamp"
+          name="edit_timestamp"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Source Channel ID (readonly) -->
+      <div class="flex flex-col">
+        <label for="field-source_channel" class="block text-sm font-medium text-gray-700">
+          Source Channel ID
+        </label>
+        <input
+          type="text"
+          id="field-source_channel"
+          name="source_channel"
+          readonly
+          class="mt-1 block w-full bg-gray-100 border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Source Channel Name -->
+      <div class="flex flex-col">
+        <label for="field-source_channel_name" class="block text-sm font-medium text-gray-700">
+          Source Channel Name
+        </label>
+        <input
+          type="text"
+          id="field-source_channel_name"
+          name="source_channel_name"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Dest Channel ID (readonly) -->
+      <div class="flex flex-col">
+        <label for="field-dest_channel" class="block text-sm font-medium text-gray-700">
+          Dest Channel ID
+        </label>
+        <input
+          type="text"
+          id="field-dest_channel"
+          name="dest_channel"
+          readonly
+          class="mt-1 block w-full bg-gray-100 border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Dest Channel Name -->
+      <div class="flex flex-col">
+        <label for="field-dest_channel_name" class="block text-sm font-medium text-gray-700">
+          Dest Channel Name
+        </label>
+        <input
+          type="text"
+          id="field-dest_channel_name"
+          name="dest_channel_name"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Message ID (readonly) -->
+      <div class="flex flex-col">
+        <label for="field-message_id" class="block text-sm font-medium text-gray-700">
+          Message ID
+        </label>
+        <input
+          type="text"
+          id="field-message_id"
+          name="message_id"
+          readonly
+          class="mt-1 block w-full bg-gray-100 border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Media Type -->
+      <div class="flex flex-col">
+        <label for="field-media_type" class="block text-sm font-medium text-gray-700">
+          Media Type
+        </label>
+        <input
+          type="text"
+          id="field-media_type"
+          name="media_type"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- File Size Bytes -->
+      <div class="flex flex-col">
+        <label for="field-file_size_bytes" class="block text-sm font-medium text-gray-700">
+          File Size (bytes)
+        </label>
+        <input
+          type="number"
+          id="field-file_size_bytes"
+          name="file_size_bytes"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Original Size -->
+      <div class="flex flex-col">
+        <label for="field-original_size" class="block text-sm font-medium text-gray-700">
+          Original Size
+        </label>
+        <input
+          type="number"
+          id="field-original_size"
+          name="original_size"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Translated Size -->
+      <div class="flex flex-col">
+        <label for="field-translated_size" class="block text-sm font-medium text-gray-700">
+          Translated Size
+        </label>
+        <input
+          type="number"
+          id="field-translated_size"
+          name="translated_size"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Translation Time -->
+      <div class="flex flex-col">
+        <label for="field-translation_time" class="block text-sm font-medium text-gray-700">
+          Translation Time (s)
+        </label>
+        <input
+          type="number"
+          id="field-translation_time"
+          name="translation_time"
+          min="0"
+          step="0.001"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Retry Count -->
+      <div class="flex flex-col">
+        <label for="field-retry_count" class="block text-sm font-medium text-gray-700">
+          Retries
+        </label>
+        <input
+          type="number"
+          id="field-retry_count"
+          name="retry_count"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Success (OK/FAIL + Tailwind Toggle) -->
+      <div class="flex items-center space-x-3 sm:col-span-2">
+        <label for="field-posting_success" class="text-sm font-medium text-gray-700">
+          Success
+        </label>
+        <input
+          type="checkbox"
+          id="field-posting_success"
+          name="posting_success"
+          class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+        />
+        <span id="success-status" class="text-sm font-semibold text-gray-900">OK</span>
+      </div>
+
+      <!-- API Error Code -->
+      <div class="flex flex-col">
+        <label for="field-api_error_code" class="block text-sm font-medium text-gray-700">
+          API Error Code
+        </label>
+        <input
+          type="number"
+          id="field-api_error_code"
+          name="api_error_code"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- Exception Message -->
+      <div class="flex flex-col sm:col-span-2">
+        <label for="field-exception_message" class="block text-sm font-medium text-gray-700">
+          Exception Message
+        </label>
+        <textarea
+          id="field-exception_message"
+          name="exception_message"
+          rows="3"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        ></textarea>
+      </div>
+
+      <!-- Previous Size -->
+      <div class="flex flex-col">
+        <label for="field-previous_size" class="block text-sm font-medium text-gray-700">
+          Previous Size
+        </label>
+        <input
+          type="number"
+          id="field-previous_size"
+          name="previous_size"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <!-- New Size -->
+      <div class="flex flex-col">
+        <label for="field-new_size" class="block text-sm font-medium text-gray-700">
+          New Size
+        </label>
+        <input
+          type="number"
+          id="field-new_size"
+          name="new_size"
+          min="0"
+          class="mt-1 block w-full bg-white border border-gray-300 rounded-md px-3 py-2 shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+        />
+      </div>
+    </form>
+  </div>
+{% endset %}
+
+{% set footer %}
+  <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-2">
+    <button
+      onclick="saveEdit()"
+      class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded"
+    >
+      Save
+    </button>
+    <button
+      onclick="closeModal('edit-modal')"
+      class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2 px-4 rounded"
+    >
+      Cancel
+    </button>
+  </div>
+{% endset %}
+
+{{ modal('edit-modal', 'Edit Event', body, footer) }}
