@@ -20,7 +20,7 @@ def compute_stats(messages):
     # Count errors: posting_success is False or api_error_code or exception_message present
     error_count = sum(
         1 for m in messages
-        if m.get("posting_success") is False or m.get("api_error_code") is not None or m.get("exception_message")
+        if m.get("posting_success") is False 
     )
     success_rate = round(100 * success_count / total_posts, 1) if total_posts > 0 else 0
     logger.debug(

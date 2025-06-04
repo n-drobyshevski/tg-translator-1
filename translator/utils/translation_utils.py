@@ -1,6 +1,7 @@
 from typing import Any, Dict
 from anthropic import Anthropic
 import logging
+import re
 from translator.config import PROMPT_TEMPLATE_PATH, load_prompt_template
 
 PROMPT_TEMPLATE = load_prompt_template()
@@ -26,4 +27,7 @@ async def translate_html(client: Anthropic, payload: Dict[str, Any]) -> str:
         temperature=0,
         messages=[{"role": "user", "content": prompt}],
     )
-    return resp.content[0].text
+    # strip out non-HTML tags like <translation>, <example>, <source>, <user>, <instructions>, <system>
+    raw = resp.content[0].text
+    cleaned = re.sub(r"</?(?:translation|example|source|user|instructions|system)>", "", raw)
+    return cleaned
