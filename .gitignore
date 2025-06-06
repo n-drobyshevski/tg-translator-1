@@ -94,4 +94,5 @@ coverage/
 # Ignore test-generated files
 test-output/
 
+my-bot.session*
 bot.session*

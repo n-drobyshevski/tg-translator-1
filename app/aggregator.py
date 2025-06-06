@@ -58,17 +58,16 @@ def build_10d_channels(
     labels = [(today - timedelta(days=d)).isoformat() for d in reversed(range(days))]
     per_chan: Dict[str, Counter[str]] = {}
     for evt in messages:
-        if evt.get("event") != "create" or not evt.get("timestamp"):
+        # include every message that has a timestamp
+        if not evt.get("timestamp"):
             continue
         chan = evt.get("source_channel_name") or evt.get("source_channel", "")
         ts = evt.get("timestamp")
-        if not ts:
-            continue
         try:
             dt = datetime.datetime.fromisoformat(ts)
             day = dt.date().isoformat()
             per_chan.setdefault(chan, Counter())[day] += 1
-        except ValueError as e:
+        except ValueError:
             continue
     series = [
         {"label": chan, "data": [per_chan[chan].get(d, 0) for d in labels]}
@@ -82,7 +81,10 @@ def build_hourly_matrix(messages: list[dict]) -> dict:
     maxv = 0
     events_by_cell = defaultdict(list)
     for m in messages:
-        if m.get("event") != "create" or not m.get("timestamp"):
+        # Accept both event_type and event field for 'create'
+        evt = m.get("event_type") or m.get("event") or ""
+        # Filter: only messages where event_type or event is 'create'
+        if evt and evt != "create":
             continue
         ts = m.get("timestamp")
         if not ts:
@@ -95,7 +97,6 @@ def build_hourly_matrix(messages: list[dict]) -> dict:
         dow = dt.strftime("%a")
         counts[(hour, dow)] += 1
         maxv = max(maxv, counts[(hour, dow)])
-        # Add event to cell
         events_by_cell[(hour, dow)].append(m)
     xLabels = [f"{h:02d}" for h in range(24)]
     yLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
