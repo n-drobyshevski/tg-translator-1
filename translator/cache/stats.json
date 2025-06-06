@@ -108,6 +108,66 @@
       "translation_time": 3.455432719551027,
       "retry_count": 0,
       "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-04T14:43:13.822216+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "328",
+      "media_type": "text",
+      "original_size": 831,
+      "translated_size": 1289,
+      "translation_time": 5.159131200000047,
+      "retry_count": 0,
+      "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-04T14:44:27.155286+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "329",
+      "media_type": "text",
+      "original_size": 839,
+      "translated_size": 1060,
+      "translation_time": 3.011567499999728,
+      "retry_count": 0,
+      "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-04T14:52:40.122637+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "331",
+      "media_type": "text",
+      "original_size": 839,
+      "translated_size": 1061,
+      "translation_time": 3.923854399999982,
+      "retry_count": 0,
+      "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-04T14:53:24.330286+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "332",
+      "media_type": "text",
+      "original_size": 1240,
+      "translated_size": 1529,
+      "translation_time": 3.8509539000006043,
+      "retry_count": 0,
+      "posting_success": true
     }
   ]
 }

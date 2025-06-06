@@ -55,6 +55,7 @@ function drawPosts10d({ labels, counts }) {
 
 /* Build (or update) the channels chart */
 function drawPosts10dChannels({ labels, series }) {
+  console.log("DEBUG drawPosts10dChannels:", { labels, series });
   const ctx = document.getElementById("chartPosts10dChannels");
   if (!ctx) return;
   if (posts10dChannelsChart) {
@@ -383,6 +384,7 @@ async function loadPostsPerChannelChart(days) {
     const res = await fetch(`/api/metrics/summary?days=${days}&include_test_channels=${includeTest ? "1" : "0"}`);
     if (!res.ok) throw new Error(res.statusText);
     const json = await res.json();
+    console.log("DEBUG loadPostsPerChannelChart:", { days, includeTest, posts_10d_channels: json.posts_10d_channels });
     if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
   } catch (err) {
     console.error("Posts per Channel fetch failed:", err);
