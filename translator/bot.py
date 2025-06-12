@@ -233,9 +233,21 @@ def register_handlers(
                 "source_html": html_text,
             }
             post_start = time.monotonic()
-            posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(
-                sender.send_message, translated, target, cache_meta
-            )
+            if (
+                media_type == "photo"
+                and meta.get("file_download_link")
+                and len(translated) < 1024
+            ):
+                pyro_log.info("Detected photo message; ready to process photo with file download link.")
+                posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(sender.send_photo_message,file_id,translated,target,cache_meta)
+            else:
+                posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(
+                    sender.send_message,
+                    translated,
+                    target,
+                    cache_meta,
+                )
+
             dest_channel_id_to_log = (
                 str(dest_channel_id_actual) if dest_channel_id_actual else ""
             )
