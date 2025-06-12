@@ -303,6 +303,38 @@
       "translation_time": 3.686435999989044,
       "retry_count": 0,
       "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-12T01:44:37.629456+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "344",
+      "media_type": "photo",
+      "file_size_bytes": 265239,
+      "original_size": 1013,
+      "translated_size": 1444,
+      "translation_time": 3.820250799995847,
+      "retry_count": 0,
+      "posting_success": true
+    },
+    {
+      "timestamp": "2025-06-12T01:45:35.582796+00:00",
+      "event_type": "create",
+      "source_channel": "-1002657093374",
+      "dest_channel": "-1002674864764",
+      "source_channel_name": "test_source",
+      "dest_channel_name": "test",
+      "message_id": "345",
+      "media_type": "photo",
+      "file_size_bytes": 265239,
+      "original_size": 319,
+      "translated_size": 572,
+      "translation_time": 2.0416968000354245,
+      "retry_count": 0,
+      "posting_success": true
     }
   ]
 }

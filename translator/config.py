@@ -103,3 +103,21 @@ def load_prompt_template():
     if PROMPT_TEMPLATE_PATH.exists():
         return PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
     return "{message_text}"
+
+from translator.models import ChannelConfig
+
+# Channel configs for use by telegram_sender and others
+CHANNEL_CONFIGS = {
+    "christianvision": ChannelConfig(
+        channel_id=os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", 0),
+        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    ),
+    "shaltnotkill": ChannelConfig(
+        channel_id=os.getenv("SHALTNOTKILL_EN_CHANNEL_ID", 0),
+        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    ),
+    "test": ChannelConfig(
+        channel_id=os.getenv("TARGET_CHANNEL_ID", 0),
+        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    ),
+}

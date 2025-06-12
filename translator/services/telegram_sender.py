@@ -1,10 +1,11 @@
 import logging
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
 
 import requests
 from dotenv import load_dotenv
 from translator.models import ChannelConfig
+from translator.config import CHANNEL_CONFIGS
 
 try:
     from .channel_logger import store_message
@@ -13,23 +14,6 @@ except ImportError:
 
 load_dotenv()
 
-# Load all channel configs once
-CHANNEL_CONFIGS = {
-    "christianvision": ChannelConfig(
-        channel_id=os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", 0),
-        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-    ),
-    "shaltnotkill": ChannelConfig(
-        channel_id=os.getenv("SHALTNOTKILL_EN_CHANNEL_ID", 0),
-        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-    ),
-    "test": ChannelConfig(
-        channel_id=os.getenv("TARGET_CHANNEL_ID", 0),
-        bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-    ),
-}
-
-# Reuse one HTTP session
 _SESSION = requests.Session()
 
 
@@ -64,49 +48,15 @@ class TelegramSender:
             messages.append(current.rstrip("\n"))
         return messages
 
-    async def send_message(
-        self,
-        text,
-        target,
-        meta=None,
-        *,
-        translation_time: float = None,
-        retry_count: int = 0,
-        api_error_code: int = None,
-        exception_message: str = None,
-        media_type: str = None,
-        file_size_bytes: int = None,
-        event: str = None,
-        edit_timestamp: str = None,
-        previous_size: int = None,
-        new_size: int = None,
-    ):
-        cfg = self.configs.get(target)
-        if not cfg:
-            logging.error("Unknown channel type: %s", target)
-            return False, None, None, "Unknown channel type"
-        if not cfg.channel_id:
-            logging.error("No channel_id for %s", target)
-            return False, None, None, "No channel_id for target"
-
-        url = f"https://api.telegram.org/bot{cfg.bot_token}/sendMessage"
-        chunks = self.split_message(text)
-        sent_msg_id = None
-        sent_chat_id = None
-        posting_success = False
-        # Stats extraction
+    def _extract_meta_fields(
+        self, meta: Any, target: str
+    ) -> Tuple[str, Optional[int], Optional[str], Optional[Any]]:
+        """Extract media_type, file_size_bytes, source_channel, message_id from meta/source_msg."""
+        media_type = "text"
+        file_size_bytes = None
         source_channel = None
-        dest_channel = str(cfg.channel_id)
-        original_size = (
-            len(meta.get("source_html", ""))
-            if meta and meta.get("source_html")
-            else len(text)
-        )
-        translated_size = len(text)
         message_id = None
-
-        # Try to extract media_type and file_size_bytes from meta if not provided
-        if not media_type and meta is not None:
+        if meta is not None:
             source_msg = meta.get("source_msg")
             if source_msg:
                 if hasattr(source_msg, "photo") and getattr(source_msg, "photo", None):
@@ -122,10 +72,6 @@ class TelegramSender:
                 ):
                     media_type = "doc"
                     file_size_bytes = getattr(source_msg.document, "file_size", None)
-                else:
-                    media_type = "text"
-                    file_size_bytes = None
-                # Try to get source_channel
                 if hasattr(source_msg, "chat"):
                     source_channel = str(getattr(source_msg.chat, "id", None))
                 message_id = getattr(source_msg, "id", None) or getattr(
@@ -133,68 +79,110 @@ class TelegramSender:
                 )
         if not source_channel and meta is not None:
             source_channel = str(meta.get("source_channel_id", ""))
+        return media_type, file_size_bytes, source_channel, message_id
 
-        for chunk in chunks:
-            # Remove unsupported tags for Telegram HTML (e.g., <br>)
-            sanitized_chunk = sanitize_html(chunk)
-            logging.info("Sending chunk to %s (chat_id %s)…", target, cfg.channel_id)
-            try:
-                r = _SESSION.post(
-                    url,
-                    json={
-                        "chat_id": cfg.channel_id,
-                        "text": sanitized_chunk,
-                        "parse_mode": "HTML",
-                    },
-                    timeout=10,
-                )
-                if r.status_code != 200:
-                    desc = r.json().get("description", r.text)
-                    logging.error("Failed to send to %s: %s", cfg.channel_id, desc)
-                    api_error_code = r.status_code
-                    exception_message = desc
-                    posting_success = False
-                    return False, None, api_error_code, exception_message
-                result = r.json().get("result", {})
-                sent_msg_id = result.get("message_id")
-                sent_chat_id = result.get("chat", {}).get("id")
-                posting_success = True
-            except Exception as e:
-                logging.error("Error sending to %s: %s", cfg.channel_id, e)
-                posting_success = False
-                exception_message = str(e)
-                return False, None, None, exception_message
-
-        logging.info("Successfully sent %d chunk(s) to %s", len(chunks), target)
-        print(text)
-        if meta is not None:
-            mapping = meta.get("mapping")
-            source_msg = meta.get("source_msg")
-            dest_channel_id = None
-            for k, v in (mapping or {}).items():
+    def _store_message(
+        self,
+        sent_chat_id: Optional[int],
+        sent_msg_id: Optional[int],
+        source_msg: Any,
+        target: str,
+        html_content: str,
+        meta: Any,
+    ) -> None:
+        mapping = meta.get("mapping") if meta else None
+        dest_channel_id = None
+        if mapping:
+            for k, v in mapping.items():
                 if v == target:
                     dest_channel_id = k
                     break
-            if dest_channel_id:
-                dest_msg_data = {
-                    "message_id": sent_msg_id,
-                    "date": getattr(source_msg, "date", None) if source_msg else None,
-                    "chat_title": target,
-                    "chat_username": "",
-                    "html": text,
-                    "source_channel_id": (
-                        getattr(source_msg.chat, "id", None) if source_msg else "None"
-                    ),
-                    "source_message_id": (
-                        (
-                            getattr(source_msg, "message_id", None)
-                            or getattr(source_msg, "id", None)
-                        )
-                        if source_msg
-                        else "None"
-                    ),
-                }
-                store_message(sent_chat_id, dest_msg_data)
+        if dest_channel_id:
+            dest_msg_data = {
+                "message_id": sent_msg_id,
+                "date": getattr(source_msg, "date", None) if source_msg else None,
+                "chat_title": target,
+                "chat_username": "",
+                "html": html_content,
+                "source_channel_id": (
+                    getattr(source_msg.chat, "id", None) if source_msg else "None"
+                ),
+                "source_message_id": (
+                    (
+                        getattr(source_msg, "message_id", None)
+                        or getattr(source_msg, "id", None)
+                    )
+                    if source_msg
+                    else "None"
+                ),
+            }
+            store_message(sent_chat_id, dest_msg_data)
+
+    def _post_telegram(
+        self, url: str, *, data: dict = None, json: dict = None
+    ) -> Tuple[bool, Optional[requests.Response], Optional[str]]:
+        try:
+            r = _SESSION.post(url, data=data, json=json, timeout=10)
+            if r.status_code != 200:
+                desc = None
+                try:
+                    desc = r.json().get("description", r.text)
+                except Exception:
+                    desc = r.text
+                return False, r, desc
+            return True, r, None
+        except Exception as e:
+            return False, None, str(e)
+
+    async def send_message(
+        self,
+        text: str,
+        target: str,
+        meta: Any = None,
+    ) -> Tuple[bool, Optional[int], Optional[int], Optional[str]]:
+        cfg = self.configs.get(target)
+        if not cfg:
+            logging.error("Unknown channel type: %s", target)
+            return False, None, None, "Unknown channel type"
+        if not cfg.channel_id:
+            logging.error("No channel_id for %s", target)
+            return False, None, None, "No channel_id for target"
+
+        url = f"https://api.telegram.org/bot{cfg.bot_token}/sendMessage"
+        chunks = self.split_message(text)
+        sent_msg_id = None
+        sent_chat_id = None
+        posting_success = False
+
+        media_type, file_size_bytes, source_channel, message_id = (
+            self._extract_meta_fields(meta, target)
+        )
+
+        for chunk in chunks:
+            sanitized_chunk = sanitize_html(chunk)
+            logging.info("Sending chunk to %s (chat_id %s)…", target, cfg.channel_id)
+            success, r, err = self._post_telegram(
+                url,
+                json={
+                    "chat_id": cfg.channel_id,
+                    "text": sanitized_chunk,
+                    "parse_mode": "HTML",
+                },
+            )
+            if not success or r is None:
+                logging.error("Failed to send to %s: %s", cfg.channel_id, err)
+                return False, None, r.status_code if r else None, err
+            result = r.json().get("result", {})
+            sent_msg_id = result.get("message_id")
+            sent_chat_id = result.get("chat", {}).get("id")
+            posting_success = True
+
+        logging.info("Successfully sent %d chunk(s) to %s", len(chunks), target)
+        if meta is not None:
+            source_msg = meta.get("source_msg")
+            self._store_message(
+                sent_chat_id, sent_msg_id, source_msg, target, text, meta
+            )
 
         return posting_success, sent_chat_id, None, None
 
@@ -203,7 +191,7 @@ class TelegramSender:
         photo: str,
         caption: str,
         target: str,
-        meta=None,
+        meta: Any = None,
     ) -> Tuple[bool, Optional[int], Optional[int], Optional[str]]:
         cfg = self.configs.get(target)
         if not cfg:
@@ -216,74 +204,39 @@ class TelegramSender:
         url = f"https://api.telegram.org/bot{cfg.bot_token}/sendPhoto"
         sanitized_caption = sanitize_html(caption)
 
-        # Stats and meta
+        media_type, file_size_bytes, source_channel, message_id = (
+            self._extract_meta_fields(meta, target)
+        )
+
         sent_msg_id = None
         sent_chat_id = None
         posting_success = False
-        source_channel = None
-        file_size_bytes = None
-        media_type = "photo"
 
-        if meta is not None:
-            source_msg = meta.get("source_msg")
-            if source_msg and hasattr(source_msg, "photo") and getattr(source_msg, "photo", None):
-                file_size_bytes = getattr(source_msg.photo, "file_size", None)
-            if source_msg and hasattr(source_msg, "chat"):
-                source_channel = str(getattr(source_msg.chat, "id", None))
-            message_id = getattr(source_msg, "id", None) or getattr(source_msg, "message_id", None)
-
-        try:
-            logging.info("Sending photo to %s (chat_id %s)…", target, cfg.channel_id)
-            r = _SESSION.post(
-                url,
-                data={
-                    "chat_id": cfg.channel_id,
-                    "photo": photo,
-                    "caption": sanitized_caption,
-                    "parse_mode": "HTML",
-                },
-                timeout=10,
-            )
-            if r.status_code != 200:
-                desc = r.json().get("description", r.text)
-                logging.error("Failed to send photo to %s: %s", cfg.channel_id, desc)
-                return False, None, r.status_code, desc
-
-            result = r.json().get("result", {})
-            sent_msg_id = result.get("message_id")
-            sent_chat_id = result.get("chat", {}).get("id")
-            posting_success = True
-        except Exception as e:
-            logging.error("Error sending photo to %s: %s", cfg.channel_id, e)
-            return False, None, None, str(e)
+        logging.info("Sending photo to %s (chat_id %s)…", target, cfg.channel_id)
+        success, r, err = self._post_telegram(
+            url,
+            data={
+                "chat_id": cfg.channel_id,
+                "photo": photo,
+                "caption": sanitized_caption,
+                "parse_mode": "HTML",
+            },
+        )
+        if not success or r is None:
+            logging.error("Failed to send photo to %s: %s", cfg.channel_id, err)
+            return False, None, r.status_code if r else None, err
+        result = r.json().get("result", {})
+        sent_msg_id = result.get("message_id")
+        sent_chat_id = result.get("chat", {}).get("id")
+        posting_success = True
 
         logging.info("Successfully sent photo to %s", target)
-        print(caption)
 
         if meta is not None:
-            mapping = meta.get("mapping")
             source_msg = meta.get("source_msg")
-            dest_channel_id = None
-            for k, v in (mapping or {}).items():
-                if v == target:
-                    dest_channel_id = k
-                    break
-            if dest_channel_id:
-                dest_msg_data = {
-                    "message_id": sent_msg_id,
-                    "date": getattr(source_msg, "date", None) if source_msg else None,
-                    "chat_title": target,
-                    "chat_username": "",
-                    "html": caption,
-                    "source_channel_id": (
-                        getattr(source_msg.chat, "id", None) if source_msg else "None"
-                    ),
-                    "source_message_id": (
-                        getattr(source_msg, "message_id", None)
-                        or getattr(source_msg, "id", None)
-                    ) if source_msg else "None",
-                }
-                store_message(sent_chat_id, dest_msg_data)
+            self._store_message(
+                sent_chat_id, sent_msg_id, source_msg, target, caption, meta
+            )
 
         return posting_success, sent_chat_id, None, None
 
@@ -292,19 +245,6 @@ class TelegramSender:
         channel_id,
         message_id,
         text,
-        *,
-        translation_time: float = None,
-        retry_count: int = 0,
-        api_error_code: int = None,
-        exception_message: str = None,
-        media_type: str = None,
-        file_size_bytes: int = None,
-        event: str = "message_edit",
-        edit_timestamp: str = None,
-        previous_size: int = None,
-        new_size: int = None,
-        source_channel: str = None,
-        dest_channel: str = None,
     ):
         """
         Edit a message in a Telegram channel by channel_id and message_id.
@@ -312,7 +252,7 @@ class TelegramSender:
         """
         bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
         url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
-        sanitized_text = text.replace("<p>", "").replace("</p>", "")
+        sanitized_text = sanitize_html(text)
         payload = {
             "chat_id": channel_id,
             "message_id": message_id,
@@ -326,7 +266,6 @@ class TelegramSender:
             resp = _SESSION.post(url, data=payload, timeout=10)
             if resp.status_code == 200 and resp.json().get("ok"):
                 posting_success = True
-                # No record_event here
                 return posting_success, None, None
             else:
                 logging.error(
@@ -338,7 +277,6 @@ class TelegramSender:
                 posting_success = False
                 api_error_code = resp.status_code
                 exception_message = resp.text
-                # No record_event here
                 return posting_success, api_error_code, exception_message
         except Exception as e:
             logging.error(
@@ -346,5 +284,4 @@ class TelegramSender:
             )
             posting_success = False
             exception_message = str(e)
-            # No record_event here
             return posting_success, None, exception_message
