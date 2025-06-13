@@ -1,17 +1,11 @@
 import logging
-import os
 from typing import List, Optional, Tuple, Any
 
 import requests
 from dotenv import load_dotenv
-from translator.models import ChannelConfig
 from translator.config import CHANNEL_CONFIGS, BOT_TOKEN
-from translator.services.stats_logger import EventRecorder
+from translator.services.event_logger import EventRecorder
 
-try:
-    from .channel_logger import store_message
-except ImportError:
-    from translator.services.channel_logger import store_message
 
 load_dotenv()
 

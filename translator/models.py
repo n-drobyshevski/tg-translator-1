@@ -45,6 +45,7 @@ class MessageEvent:
     source_message: str = ""
     translated_message: str = ""
     dest_message_id: str = ""
+    file_path: str = ""  
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dict, keeping all fields (even if empty or zero)."""

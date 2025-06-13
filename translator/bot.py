@@ -14,26 +14,24 @@ from __future__ import annotations
 import os
 import sys
 import logging
+
 # ensure project root is on PYTHONPATH when running this file directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from datetime import timezone, datetime
 import asyncio
 import html
-import requests
 import signal
 import time
 import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, Tuple
 
 from anthropic import Anthropic
-from translator.config import CONFIG, load_prompt_template, CACHE_DIR
-from translator.models import MetadataRequest, MessageEvent
+from translator.config import CONFIG, CACHE_DIR
+from translator.models import MetadataRequest
 
 from pyrogram import filters
 from pyrogram.client import Client
-from pyrogram.enums import MessageEntityType
 from telegram.error import TelegramError
 from telegram.ext import Application
 
@@ -41,15 +39,9 @@ from telegram.ext import Application
 from translator.utils.utils_html import entities_to_html
 from translator.utils.utils_async import run_with_retries
 from translator.utils.translation_utils import translate_html
-from translator.utils.message_utils import (
-    get_media_info,
-    build_payload,
-    log_and_store_message,
-    extract_channel_info,
-)
+from translator.utils.message_utils import get_media_info, build_payload
 from translator.services.telegram_sender import TelegramSender
-from translator.services.channel_logger import store_message, find_dest_id
-from translator.services.stats_logger import record_event, build_event_kwargs, EventRecorder
+from translator.services.event_logger import EventRecorder
 
 # PTB optional rate limiter
 try:
@@ -74,15 +66,15 @@ try:
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL, logging.INFO),
         format="%(asctime)s — %(levelname)s — %(name)s — %(message)s",
-        filename=LOG_FILE_PATH,   # Log file path in cache/
-        filemode="a",             # Append mode
-        encoding="utf-8"          # Ensure UTF-8 output
+        filename=LOG_FILE_PATH,  # Log file path in cache/
+        filemode="a",  # Append mode
+        encoding="utf-8",  # Ensure UTF-8 output
     )
 except OSError as e:
     print(f"WARNING: Could not write to log file {LOG_FILE_PATH}: {e}")
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL, logging.INFO),
-        format="%(asctime)s — %(levelname)s — %(name)s — %(message)s"
+        format="%(asctime)s — %(levelname)s — %(name)s — %(message)s",
     )
 
 # Set up console logging (StreamHandler)
@@ -102,7 +94,11 @@ try:
         pass
 except OSError as e:
     logger = logging.getLogger()
-    logger.error("OSError: write error to log file %s: %s. Logging to console only.", LOG_FILE_PATH, e)
+    logger.error(
+        "OSError: write error to log file %s: %s. Logging to console only.",
+        LOG_FILE_PATH,
+        e,
+    )
 
 
 ###############################################################################
@@ -123,7 +119,6 @@ async def ptb_worker(ptb_app: Application, stop_event: asyncio.Event):
         meta.pop("response", None)
         meta["chat"] = None
         meta["file"] = None
-
         # 1 Chat‑level information ---------------------------------------
         try:
             chat_obj = await bot.get_chat(req.chat_id)
@@ -168,11 +163,9 @@ def register_handlers(
     max_size = 20 * 1024 * 1024
 
     # The following handler matches ALL channel messages, which can cause duplicate handling
-    @pyro.on_message(
-        filters.channel
-        & filters.chat(CONFIG.get_source_channel_ids())
-    )
+    @pyro.on_message(filters.channel & filters.chat(CONFIG.get_source_channel_ids()))
     async def handle_message(_: Client, msg):
+        pyro_log.info("\n\n")
         pyro_log.info("=============================================")
         pyro_log.info("==== BEGIN HANDLING MESSAGE %s ====", msg.id)
         pyro_log.info("=============================================")
@@ -198,6 +191,9 @@ def register_handlers(
         try:
             await query_queue.put(req)
             meta = await req.response
+            file_path = meta.get("file").get("file_path")
+            recorder.set(file_path=file_path)
+            # Convert entities to HTML
             html_text = entities_to_html(text, msg.entities or msg.caption_entities)
         except Exception as e:
             pyro_log.warning("!!! PTB worker failed: %s", e)
@@ -206,7 +202,9 @@ def register_handlers(
 
         # === 2. Build payload and log original message ===
         payload = build_payload(msg, html_text, meta)
-        recorder.set(message_id=(getattr(msg, "id", None) or getattr(msg, "message_id", None)))
+        recorder.set(
+            message_id=(getattr(msg, "id", None) or getattr(msg, "message_id", None))
+        )
 
         # === 3. Translate message ===
         translation_start = time.monotonic()
@@ -219,8 +217,13 @@ def register_handlers(
         dest_id = CONFIG.get_destination_id(recorder.get("source_channel_id"))
         recorder.set(dest_channel_id=dest_id)
         recorder.set(dest_channel_name=CONFIG.get_channel_name(dest_id))
-        pyro_log.info("Source channel: %s (%s), Dest - id: %s name: %s", 
-                      recorder.get("source_channel_name"), recorder.get("source_channel_id"), dest_id, recorder.get("dest_channel_name"))
+        pyro_log.info(
+            "Source channel: %s (%s), Dest - id: %s name: %s",
+            recorder.get("source_channel_name"),
+            recorder.get("source_channel_id"),
+            dest_id,
+            recorder.get("dest_channel_name"),
+        )
         try:
             translated = await run_with_retries(translate_html, anthropic, payload)
             translation_time = time.monotonic() - translation_start
@@ -237,19 +240,26 @@ def register_handlers(
                 and meta.get("file_download_link")
                 and len(translated) < 1024
             ):
-                pyro_log.info("Detected photo message; ready to process photo with file download link.")
-                await run_with_retries(sender.send_photo_message,file_id,translated,recorder)
-            else:
-                await run_with_retries(
-                    sender.send_message,
-                    translated,
-                    recorder
+                pyro_log.info(
+                    "Detected photo message; ready to process photo with file download link."
                 )
-            pyro_log.info("DONE chat:%s msg:%s → destination msg: %s", msg.chat.title, msg.id, dest_id)
+                await run_with_retries(
+                    sender.send_photo_message, file_id, translated, recorder
+                )
+            else:
+                await run_with_retries(sender.send_message, translated, recorder)
+            pyro_log.info(
+                "DONE chat:%s msg:%s → destination msg: %s",
+                msg.chat.title,
+                msg.id,
+                dest_id,
+            )
         except Exception as exc:
             exception_message = str(exc)
             api_error_code = getattr(exc, "status", None)
-            recorder.set(exception_message=exception_message, api_error_code=api_error_code)
+            recorder.set(
+                exception_message=exception_message, api_error_code=api_error_code
+            )
             pyro_log.error("FAILED %s: %s", msg.id, exc)
         # === 4. Log event and finalize recorder ===
         recorder.finalize()
@@ -258,11 +268,10 @@ def register_handlers(
         pyro_log.info("=============================================")
 
     @pyro.on_edited_message(
-        filters.channel
-        & filters.chat(CONFIG.get_source_channel_ids())
+        filters.channel & filters.chat(CONFIG.get_source_channel_ids())
     )
     async def handle_edit_message(_: Client, msg):
-        from translator.config import CHANNEL_CONFIGS
+        pyro_log.info("\n\n")
         pyro_log.info("=============================================")
         pyro_log.info("==== BEGIN HANDLING EDITED MESSAGE %s ====", msg.id)
         pyro_log.info("=============================================")
@@ -313,8 +322,12 @@ def register_handlers(
         dest_id = CONFIG.get_destination_id(recorder.get("source_channel_id"))
         recorder.set(dest_channel_id=dest_id)
         recorder.set(dest_channel_name=CONFIG.get_channel_name(dest_id))
-        pyro_log.info("Source channel: %s (%s), Dest - id: %s", 
-                      recorder.get("source_channel_name"), recorder.get("source_channel_id"), dest_id)
+        pyro_log.info(
+            "Source channel: %s (%s), Dest - id: %s",
+            recorder.get("source_channel_name"),
+            recorder.get("source_channel_id"),
+            dest_id,
+        )
 
         try:
             pyro_log.info("Translating edited message %s → %s...", msg.id, dest_id)
@@ -334,7 +347,9 @@ def register_handlers(
             )
         except Exception as exc:
             pyro_log.error("FAILED TO EDIT %s: %s", msg.id, exc)
-            recorder.set(exception_message=exception_message, api_error_code=api_error_code)
+            recorder.set(
+                exception_message=exception_message, api_error_code=api_error_code
+            )
 
         recorder.finalize()
         pyro_log.info("=============================================")
@@ -356,7 +371,10 @@ async def main_async():
             conn.close()
         except sqlite3.OperationalError as e:
             if "database is locked" in str(e):
-                logger.error("Session file %s is locked. Stop all bots and delete this file before restarting.", session_file)
+                logger.error(
+                    "Session file %s is locked. Stop all bots and delete this file before restarting.",
+                    session_file,
+                )
                 raise
     # --- end session lock check ---
 
@@ -388,7 +406,9 @@ async def main_async():
     logger.info("=== BOT SHUTDOWN COMPLETE ===")
 
 
-def init_clients() -> Tuple[Client, Application, Anthropic, TelegramSender, EventRecorder]:
+def init_clients() -> (
+    Tuple[Client, Application, Anthropic, TelegramSender, EventRecorder]
+):
     pyro = Client(
         "bot",
         api_id=CONFIG.TELEGRAM_API_ID,
