@@ -84,6 +84,23 @@ def get_last_messages(channel_id):
     return channel_cache.get_last_messages(channel_id)
 
 
+def find_dest_id(dest_channel_id: str, source_message_id: str) -> Optional[str]:
+    """
+    Search for a message in the given channel by its source_message_id.
+    Returns the message_id if found, else None.
+    """
+    messages = channel_cache.get_last_messages(dest_channel_id)
+    print(f"Searching for message {source_message_id} in channel {dest_channel_id}")
+    for msg in messages:
+        if str(msg.get("source_message_id")) == str(source_message_id):
+            print(
+                f"Found message {source_message_id} in channel {dest_channel_id}"
+            )
+            return msg.get("message_id")
+    print(f"Message {source_message_id} not found in channel [ {dest_channel_id}  ]")
+    return None
+
+
 # add this so admin_manager can import it
 def check_deleted_messages(client):
     channel_cache.check_deleted_messages(client)

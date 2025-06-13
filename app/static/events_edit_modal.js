@@ -24,6 +24,7 @@ function showEditModal(eventObj) {
   document.getElementById("field-dest_channel_name").value =
     eventObj.dest_channel_name || "";
   document.getElementById("field-message_id").value = eventObj.message_id || "";
+  document.getElementById("field-dest_message_id").value = eventObj.dest_message_id || "";
   document.getElementById("field-media_type").value = eventObj.media_type || "";
   document.getElementById("field-file_size_bytes").value =
     eventObj.file_size_bytes ?? "";
@@ -92,6 +93,8 @@ function saveEdit() {
       ? Number(data.get("previous_size"))
       : null,
     new_size: data.get("new_size") ? Number(data.get("new_size")) : null,
+    message_id: data.get("message_id"),
+    dest_message_id: data.get("dest_message_id"),
   };
 
   fetch("/admin/events/edit", {

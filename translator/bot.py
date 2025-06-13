@@ -17,7 +17,7 @@ import logging
 # ensure project root is on PYTHONPATH when running this file directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-
+from datetime import timezone, datetime
 import asyncio
 import html
 import requests
@@ -25,10 +25,10 @@ import signal
 import time
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from anthropic import Anthropic
-from translator.config import CONFIG, PROMPT_TEMPLATE_PATH, load_prompt_template, CACHE_DIR
+from translator.config import CONFIG, load_prompt_template, CACHE_DIR
 from translator.models import MetadataRequest, MessageEvent
 
 from pyrogram import filters
@@ -47,11 +47,9 @@ from translator.utils.message_utils import (
     log_and_store_message,
     extract_channel_info,
 )
-from translator.utils.channel_utils import TelegramAPI, format_channel_id, validate_channel
-
 from translator.services.telegram_sender import TelegramSender
-from translator.services.channel_logger import store_message
-from translator.services.stats_logger import record_event, build_event_kwargs
+from translator.services.channel_logger import store_message, find_dest_id
+from translator.services.stats_logger import record_event, build_event_kwargs, EventRecorder
 
 # PTB optional rate limiter
 try:
@@ -120,7 +118,7 @@ async def ptb_worker(ptb_app: Application, stop_event: asyncio.Event):
 
         # start meta with every attribute present in req
         meta: Dict[str, Any] = req.__dict__.copy()
-        ptb_log.info("Initial meta: %s", meta)
+        # ptb_log.info("Initial meta: %s", meta)
         # ensure future not leaked to meta
         meta.pop("response", None)
         meta["chat"] = None
@@ -165,23 +163,33 @@ async def ptb_worker(ptb_app: Application, stop_event: asyncio.Event):
 
 
 def register_handlers(
-    pyro: Client, anthropic: Anthropic, sender: TelegramSender, mapping: Dict[int, str]
+    pyro: Client, anthropic: Anthropic, sender: TelegramSender, recorder: EventRecorder
 ):
     max_size = 20 * 1024 * 1024
 
-    @pyro.on_message(filters.channel & filters.chat(list(mapping.keys())))
+    # The following handler matches ALL channel messages, which can cause duplicate handling
+    @pyro.on_message(
+        filters.channel
+        & filters.chat(CONFIG.get_source_channel_ids())
+    )
     async def handle_message(_: Client, msg):
         pyro_log.info("=============================================")
         pyro_log.info("==== BEGIN HANDLING MESSAGE %s ====", msg.id)
         pyro_log.info("=============================================")
-        target = mapping.get(msg.chat.id)
-        if not target:
-            return
 
+        # === 0. Prepare recorder and extract metadata ===
+        recorder.set(timestamp=datetime.now(timezone.utc).isoformat())
+        recorder.set(source_channel_id=msg.chat.id, source_channel_name=msg.chat.title)
+        recorder.set(event_type="create")
         text = msg.text or msg.caption or ""
         file_id, file_size_bytes, media_type = get_media_info(msg, max_size)
 
-        # Request metadata from PTB
+        recorder.set(
+            media_type=media_type,
+            file_size_bytes=file_size_bytes,
+            original_size=len(text),
+        )
+        # === 1. Request metadata from PTB ===
         req = MetadataRequest(msg.chat.id, msg.id, file_id)
         raw_entities = msg.entities or msg.caption_entities or []
         req.message_entities = [
@@ -196,125 +204,141 @@ def register_handlers(
             meta = {}
             html_text = text
 
+        # === 2. Build payload and log original message ===
         payload = build_payload(msg, html_text, meta)
-        msg_id = log_and_store_message(msg, html_text)
-        import json
-        pyro_log.info("Payload data: %s", json.dumps(payload, ensure_ascii=False, indent=2, default=str))
-        pyro_log.info("Logged message id: %s", msg_id)
+        recorder.set(message_id=(getattr(msg, "id", None) or getattr(msg, "message_id", None)))
+
+        # === 3. Translate message ===
         translation_start = time.monotonic()
         retry_count = 0
         translation_time = None
         translated = ""
         exception_message = None
         api_error_code = None
-        posting_success = False
 
-        source_channel_id, source_channel_name, dest_channel_id, dest_channel_name = (
-            extract_channel_info(msg, mapping, target)
-        )
-
+        dest_id = CONFIG.get_destination_id(recorder.get("source_channel_id"))
+        recorder.set(dest_channel_id=dest_id)
+        recorder.set(dest_channel_name=CONFIG.get_channel_name(dest_id))
+        pyro_log.info("Source channel: %s (%s), Dest - id: %s name: %s", 
+                      recorder.get("source_channel_name"), recorder.get("source_channel_id"), dest_id, recorder.get("dest_channel_name"))
         try:
-            # Translation with retries
-            for attempt in range(1, 4):
-                try:
-                    translated = await translate_html(anthropic, payload)
-                    translation_time = time.monotonic() - translation_start
-                    retry_count = attempt - 1
-                    break
-                except Exception as e:
-                    if attempt == 3:
-                        raise
-                    retry_count = attempt
-                    await asyncio.sleep(2)
-            pyro_log.info("Translated message: %s", translated)
-            cache_meta = {
-                "mapping": mapping,
-                "source_msg": msg,
-                "source_html": html_text,
-            }
-            post_start = time.monotonic()
+            translated = await run_with_retries(translate_html, anthropic, payload)
+            translation_time = time.monotonic() - translation_start
+            # pyro_log.info("Translated message: %s", translated)
+            recorder.set(
+                source_message=html.escape(html_text),
+                translated_size=len(translated),
+                translated_message=html.escape(translated),
+                translation_time=translation_time,
+                retry_count=retry_count,
+            )
             if (
                 media_type == "photo"
                 and meta.get("file_download_link")
                 and len(translated) < 1024
             ):
                 pyro_log.info("Detected photo message; ready to process photo with file download link.")
-                posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(sender.send_photo_message,file_id,translated,target,cache_meta)
+                await run_with_retries(sender.send_photo_message,file_id,translated,recorder)
             else:
-                posting_success, dest_channel_id_actual, api_error_code, exception_message = await run_with_retries(
+                await run_with_retries(
                     sender.send_message,
                     translated,
-                    target,
-                    cache_meta,
+                    recorder
                 )
-
-            dest_channel_id_to_log = (
-                str(dest_channel_id_actual) if dest_channel_id_actual else ""
-            )
-
-            # --- Refactored event logging using dict-based pattern ---
-            if record_event:
-                event_kwargs = {
-                    "event_type": "message",
-                    "source_channel": source_channel_id,
-                    "dest_channel": dest_channel_id_to_log,
-                    "source_channel_name": source_channel_name,
-                    "dest_channel_name": dest_channel_name,
-                    "message_id": str(msg_id),
-                    "media_type": media_type,
-                    "file_size_bytes": file_size_bytes,
-                    "original_size": len(text),
-                    "translated_size": len(translated),
-                    "translation_time": translation_time,
-                    "retry_count": retry_count,
-                    "posting_success": posting_success,
-                    "api_error_code": api_error_code,
-                    "exception_message": exception_message,
-                    # "event": None,
-                    # "edit_timestamp": None,
-                    # "previous_size": None,
-                    # "new_size": None,
-                }
-                # Remove None values
-                event_kwargs = {k: v for k, v in event_kwargs.items() if v is not None}
-                event_kwargs = build_event_kwargs(**event_kwargs)
-                record_event(**event_kwargs)
-            # --- end refactor ---
-
-            pyro_log.info("DONE %s → %s", msg.id, target)
+            pyro_log.info("DONE chat:%s msg:%s → destination msg: %s", msg.chat.title, msg.id, dest_id)
         except Exception as exc:
             exception_message = str(exc)
             api_error_code = getattr(exc, "status", None)
-            # --- Refactored event logging using dict-based pattern ---
-            if record_event:
-                event_kwargs = {
-                    "event_type": "message",
-                    "source_channel": source_channel_id,
-                    "dest_channel": dest_channel_id,
-                    "source_channel_name": source_channel_name,
-                    "dest_channel_name": dest_channel_name,
-                    "message_id": str(msg_id),
-                    "media_type": media_type,
-                    "file_size_bytes": file_size_bytes,
-                    "original_size": len(text),
-                    "translated_size": len(translated) if translated else 0,
-                    "translation_time": translation_time,
-                    "retry_count": retry_count,
-                    "posting_success": False,
-                    "api_error_code": api_error_code,
-                    "exception_message": exception_message,
-                    # "event": None,
-                    # "edit_timestamp": None,
-                    # "previous_size": None,
-                    # "new_size": None,
-                }
-                event_kwargs = {k: v for k, v in event_kwargs.items() if v is not None}
-                event_kwargs = build_event_kwargs(**event_kwargs)
-                record_event(**event_kwargs)
-            # --- end refactor ---
+            recorder.set(exception_message=exception_message, api_error_code=api_error_code)
             pyro_log.error("FAILED %s: %s", msg.id, exc)
+        # === 4. Log event and finalize recorder ===
+        recorder.finalize()
         pyro_log.info("=============================================")
         pyro_log.info("==== END HANDLING MESSAGE %s ====", msg.id)
+        pyro_log.info("=============================================")
+
+    @pyro.on_edited_message(
+        filters.channel
+        & filters.chat(CONFIG.get_source_channel_ids())
+    )
+    async def handle_edit_message(_: Client, msg):
+        from translator.config import CHANNEL_CONFIGS
+        pyro_log.info("=============================================")
+        pyro_log.info("==== BEGIN HANDLING EDITED MESSAGE %s ====", msg.id)
+        pyro_log.info("=============================================")
+        # === 0. Prepare recorder and extract metadata ===
+        recorder.set(timestamp=datetime.now(timezone.utc).isoformat())
+        recorder.set(source_channel_id=msg.chat.id, source_channel_name=msg.chat.title)
+        recorder.set(event_type="create")
+        text = msg.text or msg.caption or ""
+        file_id, file_size_bytes, media_type = get_media_info(msg, max_size)
+
+        recorder.set(
+            media_type=media_type,
+            file_size_bytes=file_size_bytes,
+            original_size=len(text),
+        )
+
+        text = msg.text or msg.caption or ""
+        file_id, file_size_bytes, media_type = get_media_info(msg, max_size)
+
+        # === 1. Request metadata from PTB ===TB
+        req = MetadataRequest(msg.chat.id, msg.id, file_id)
+        raw_entities = msg.entities or msg.caption_entities or []
+        req.message_entities = [
+            e.to_dict() if hasattr(e, "to_dict") else e for e in raw_entities
+        ]
+        try:
+            await query_queue.put(req)
+            meta = await req.response
+            html_text = entities_to_html(text, msg.entities or msg.caption_entities)
+        except Exception as e:
+            pyro_log.warning("!!! PTB worker failed: %s", e)
+            meta = {}
+            html_text = text
+
+        # === 2. Build payload and log original message ===
+        payload = build_payload(msg, html_text, meta)
+        recorder.set(
+            message_id=(getattr(msg, "id", None) or getattr(msg, "message_id", None))
+        )
+        # === 3. Translate message ===
+        translation_start = time.monotonic()
+        retry_count = 0
+        translation_time = None
+        translated = ""
+        exception_message = None
+        api_error_code = None
+
+        dest_id = CONFIG.get_destination_id(recorder.get("source_channel_id"))
+        recorder.set(dest_channel_id=dest_id)
+        recorder.set(dest_channel_name=CONFIG.get_channel_name(dest_id))
+        pyro_log.info("Source channel: %s (%s), Dest - id: %s", 
+                      recorder.get("source_channel_name"), recorder.get("source_channel_id"), dest_id)
+
+        try:
+            pyro_log.info("Translating edited message %s → %s...", msg.id, dest_id)
+            translated = await run_with_retries(translate_html, anthropic, payload)
+            pyro_log.info("Translated.")
+
+            # Now edit the message in the dest channel
+            # edit_message is a synchronous function, so call it directly (do not await run_with_retries)
+            await run_with_retries(
+                sender.edit_message, dest_id, msg.id, translated, recorder
+            )
+            pyro_log.info(
+                "EDIT DONE chat:%s msg:%s → destination msg: %s",
+                msg.chat.title,
+                msg.id,
+                dest_id,
+            )
+        except Exception as exc:
+            pyro_log.error("FAILED TO EDIT %s: %s", msg.id, exc)
+            recorder.set(exception_message=exception_message, api_error_code=api_error_code)
+
+        recorder.finalize()
+        pyro_log.info("=============================================")
+        pyro_log.info("==== END HANDLING EDITED MESSAGE %s ======", msg.id)
         pyro_log.info("=============================================")
 
 
@@ -336,10 +360,9 @@ async def main_async():
                 raise
     # --- end session lock check ---
 
-    pyro, ptb_app, anthropic, sender = init_clients()
-    mapping = get_channel_mapping()
+    pyro, ptb_app, anthropic, sender, event_recorder = init_clients()
 
-    register_handlers(pyro, anthropic, sender, mapping)
+    register_handlers(pyro, anthropic, sender, event_recorder)
     # register_channel_logger(pyro)
 
     await ptb_app.initialize()
@@ -365,7 +388,7 @@ async def main_async():
     logger.info("=== BOT SHUTDOWN COMPLETE ===")
 
 
-def init_clients() -> Tuple[Client, Application, Anthropic, TelegramSender]:
+def init_clients() -> Tuple[Client, Application, Anthropic, TelegramSender, EventRecorder]:
     pyro = Client(
         "bot",
         api_id=CONFIG.TELEGRAM_API_ID,
@@ -379,17 +402,10 @@ def init_clients() -> Tuple[Client, Application, Anthropic, TelegramSender]:
         except RuntimeError:
             pass
     ptb_app = builder.build()
+    recorder = EventRecorder()
     anthropic_client = Anthropic(api_key=CONFIG.ANTHROPIC_API_KEY)
     sender = TelegramSender()
-    return pyro, ptb_app, anthropic_client, sender
-
-
-def get_channel_mapping() -> Dict[int, str]:
-    return {
-        int(CONFIG.CHANNELS["christianvision"]): "christianvision",
-        int(CONFIG.CHANNELS["shaltnotkill"]): "shaltnotkill",
-        int(CONFIG.CHANNELS["test"]): "test",
-    }
+    return pyro, ptb_app, anthropic_client, sender, recorder
 
 
 if __name__ == "__main__":

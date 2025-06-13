@@ -2,7 +2,7 @@ from typing import Any, Dict
 from anthropic import Anthropic
 import logging
 import re
-from translator.config import PROMPT_TEMPLATE_PATH, load_prompt_template
+from translator.config import  load_prompt_template
 
 PROMPT_TEMPLATE = load_prompt_template()
 
@@ -20,7 +20,7 @@ def build_prompt(html_text: str, channel: str, link: str) -> str:
 async def translate_html(client: Anthropic, payload: Dict[str, Any]) -> str:
     """Send payload to Anthropic and return translated text."""
     prompt = build_prompt(payload["Html"], payload["Channel"], payload["Link"])
-    logging.info(f"Generated prompt: {prompt}")
+    # logging.info(f"Generated prompt: {prompt}")
     resp = client.messages.create(
         model="claude-3-haiku-20240307",
         max_tokens=1500,

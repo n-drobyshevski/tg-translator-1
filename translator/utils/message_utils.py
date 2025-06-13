@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 from translator.services.channel_logger import store_message
+from translator.config import CHANNEL_CONFIGS
 
 def get_media_info(msg, max_size: int) -> Tuple[Optional[str], Optional[int], str]:
     """Extract file_id, file_size_bytes, and media_type from message."""
