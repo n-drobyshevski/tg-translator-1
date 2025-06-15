@@ -2,7 +2,7 @@ import os
 import json
 from typing import Any, Dict,  Tuple
 import logging
-from translator.config import STATS_PATH, DEFAULT_STATS
+from translator.config import EVENTS_PATH, DEFAULT_STATS
 
 from translator.models import MessageEvent
 
@@ -16,7 +16,7 @@ class EventRecorder:
 
     def _load_base(self) -> None:
         try:
-            with open(STATS_PATH, "r", encoding="utf-8") as f:
+            with open(EVENTS_PATH, "r", encoding="utf-8") as f:
                 self.stats = json.load(f)
         except:
             self.stats = DEFAULT_STATS.copy()
@@ -68,12 +68,37 @@ class EventRecorder:
         self.stats["messages"].append(evt.to_dict())
 
         # Write stats
-        os.makedirs(os.path.dirname(STATS_PATH), exist_ok=True)
-        with open(STATS_PATH, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(EVENTS_PATH), exist_ok=True)
+        with open(EVENTS_PATH, "w", encoding="utf-8") as f:
             json.dump(self.stats, f, ensure_ascii=False, indent=2)
         logging.info("Event recorded")
         # Optionally reset for reuse
         self.reset()
+
+    def get_channel_cache(self) -> Dict[str, Any]:
+        """Get the channel cache data for looking up source messages"""
+        try:
+            # Get path to channel cache
+            cache_dir = os.path.dirname(EVENTS_PATH)
+            cache_path = os.path.join(cache_dir, "channel_cache.json")
+            
+            logging.debug(f"Loading channel cache from {cache_path}")
+            
+            # Load channel cache file
+            with open(cache_path, "r", encoding="utf-8") as f:
+                channel_cache = json.load(f)
+                logging.debug(f"Loaded channel cache with {len(channel_cache)} channels")
+                return channel_cache
+                
+        except FileNotFoundError:
+            logging.warning("Channel cache file not found")
+            return {}
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse channel cache: {e}")
+            return {}
+        except Exception as e:
+            logging.error(f"Error loading channel cache: {e}")
+            return {}
 
     def __str__(self) -> str:
         lines = ["EventRecorder payload:"]

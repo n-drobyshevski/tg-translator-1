@@ -26,6 +26,75 @@
         cursor: pointer;
         transition: background 0.15s;
       }
+      
+      /* Column-specific styles */
+      .col-timestamp {
+        max-width: 120px !important;
+        min-width: 100px !important;
+      }
+      
+      .col-event {
+        max-width: 120px !important;
+      }
+
+      .col-source_channel, .col-dest_channel {
+        max-width: 100px !important;
+        min-width: 80px !important;
+      }
+      
+      .col-source_channel_name, .col-dest_channel_name {
+        max-width: 180px !important;
+        min-width: 150px !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .col-message_id {
+        max-width: 80px !important;
+        min-width: 60px !important;
+        text-align: right;
+      }
+
+      .col-retry_count {
+        max-width: 60px !important;
+        min-width: 40px !important;
+        text-align: right;
+      }
+
+      .col-posting_success {
+        max-width: 70px !important;
+        min-width: 70px !important;
+        text-align: center;
+      }      .col-source_content {
+        min-width: 180px !important;
+        max-width: 350px !important;
+        background-color: #f9fcff; /* Very light blue background */
+        font-family: 'Roboto Mono', monospace;
+        font-size: 13px;
+        color: #444;
+      }
+      
+      .col-preview {
+        min-width: 200px !important;
+        max-width: 400px !important;
+      }
+      
+      /* Tooltip styles */
+      .col-header {
+        position: relative;
+      }
+      
+      .enterprise-table td, .enterprise-table th {
+        padding: 8px 12px;
+        font-size: 14px;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px; /* Default max width */
+      }
+      
       .enterprise-table th.sorted { background: #e9edf5; }
       .enterprise-table th:last-child,
       .enterprise-table td:last-child { border-right: none; }
@@ -101,15 +170,70 @@
         .column-chooser-modal { min-width: 95vw; }
         .filter-btn-row { flex-direction: column !important; gap: 0.5rem !important; }
       }
+      /* Styles for the details modal content */
+      .message-fallback {
+        color: #777;
+        font-style: italic;
+      }
+      .message-text {
+        white-space: pre-wrap; /* Allow wrapping */
+        word-break: break-word; /* Break long words */
+        font-family: 'Roboto Mono', monospace; /* Monospaced font for code/text */
+        font-size: 13px;
+        background-color: #fff;
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
+      .message-media {
+        font-size: 12px;
+        color: #555;
+        margin-top: 5px;
+      }
+      .success-badge {
+        background-color: #d1fae5; /* Light green */
+        color: #065f46; /* Dark green */
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .error-badge {
+        background-color: #fee2e2; /* Light red */
+        color: #991b1b; /* Dark red */
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .info-badge {
+        background-color: #e0e7ff; /* Light indigo */
+        color: #3730a3; /* Dark indigo */
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .error-details {
+        font-size: 12px;
+        color: #b91c1c; /* Slightly lighter red for details */
+        margin-top: 4px;
+        display: block;
+      }
     </style>
 {% endblock %}
 
 {% block header %}
-{% set href = '/admin' %}
-<div class="flex flex-row items-center">
-  {% include 'components/back_button.html' %}
-  <h1 class="text-2xl font-bold tracking-tight">Admin Events</h1>
+<div class="flex items-center w-full">
+  
+  <div class="flex flex-row w-full items-center justify-between">
+        
+  <h1 class="page-title">
+    <span>Admin Events</span>
+  </h1>
+  </div>
 </div>
+
 {% endblock %}
 
 {% block content %}
@@ -141,9 +265,26 @@
 
       <!-- Modals rendered by macro: -->
       <div id="modals-here">
-        {{ modal('details-modal', 'Event Details', '', '<button onclick="closeModal(\'details-modal\')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
-        {{ modal('preview-modal', 'Full Message Preview', '', '<button onclick="closeModal(\'preview-modal\')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
-        {{ modal('column-chooser-modal', 'Customize Columns', '<div id="columnChooserList"></div>', '<button onclick="closeModal(\'column-chooser-modal\')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
+        {% set details_modal_body %}
+        <div id="details-modal-content-wrapper" class="space-y-3">
+            <div id="message-status" class="mb-3 text-sm"></div>
+            <div>
+                <h4 class="text-md font-semibold mb-1 text-slate-700">Source Message</h4>
+                <div id="source-message-preview" class="p-2.5 bg-slate-50 border border-slate-200 rounded text-xs overflow-auto max-h-48 min-h-[50px]">
+                    <div class="message-fallback">Loading source message...</div>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-md font-semibold mb-1 text-slate-700">Translated Message (from Event)</h4>
+                <div id="translated-message-preview" class="p-2.5 bg-slate-50 border border-slate-200 rounded text-xs overflow-auto max-h-48 min-h-[50px]">
+                    <div class="message-fallback">Loading translated preview...</div>
+                </div>
+            </div>
+        </div>
+        {% endset %}
+        {{ modal('details-modal', 'Event Details', details_modal_body, '<button onclick="closeModal(&#39;details-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
+        {{ modal('preview-modal', 'Full Message Preview', '', '<button onclick="closeModal(&#39;preview-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
+        {{ modal('column-chooser-modal', 'Customize Columns', '<div id="columnChooserList"></div>', '<button onclick="closeModal(&#39;column-chooser-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
         {% include 'events_edit_modal.html' %}
       </div>
     </div>
@@ -153,14 +294,55 @@
 {% block scripts %}
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="{{ url_for('static', filename='events_edit_modal.js') }}"></script>
+
+  {# Data island for channel_cache JSON #}
+  <script id="channelCacheJsonData" type="application/json">
+    {{- channel_cache | tojson | safe -}}
+  </script>
+
   <script>
+    console.log('Admin Events page script started.');
+
+    // This will be the globally accessible parsed cache data for this page
+    let channelCacheData = {};
+
+    try {
+        const channelCacheJsonElement = document.getElementById('channelCacheJsonData');
+        // Ensure element exists and textContent is not null before accessing
+        const channelCacheJsonString = channelCacheJsonElement ? channelCacheJsonElement.textContent : null;
+
+        if (channelCacheJsonString && channelCacheJsonString.trim() !== "") {
+            channelCacheData = JSON.parse(channelCacheJsonString);
+            // console.log("Successfully parsed channel_cache from data island:", channelCacheData); // For debugging
+        } else {
+            console.warn("channel_cache JSON string from data island is empty, not found, or whitespace.");
+        }
+    } catch (error) {
+        console.error("Error parsing channel_cache JSON from data island:", error);
+        const rawContent = document.getElementById('channelCacheJsonData') ? document.getElementById('channelCacheJsonData').textContent : "Element not found";
+        // console.error("Raw content from data island was:", rawContent); // Be cautious with logging potentially large/sensitive data
+        // channelCacheData remains {}
+    }
+
+    // Initialize cache for events_edit_modal.js if its initCache function is available
+    // This replaces the previous block: var rawJsonData = ...; try { var parsedCacheData = JSON.parse(rawJsonData); initCache(parsedCacheData); ... }
+    if (typeof initCache === "function") {
+        initCache(channelCacheData || {}); // Pass the parsed data
+    } else {
+        // console.warn("initCache function (from events_edit_modal.js) not found at initial parse time."); // Optional warning
+    }
+
 /*==========================================================================================
   → GLOBAL VARIABLES & UTILITY FUNCTIONS
 ==========================================================================================*/
 const FIELDS_KEY = "admin_stats_visible_fields_v2";
 const ORDER_KEY = "admin_stats_column_order_v2";
 
-let allFields = [], eventsData = [], cacheData = [];
+let allFields = [], eventsData = []; 
+// The 'let channelCacheData = {};' declaration and subsequent try-catch block that previously re-parsed
+// '{{ channel_cache | tojson | safe }}' is removed, as 'channelCacheData' is now populated above.
+// channelCacheData is already defined and populated from the data island.
+
 let displayedEvents = []; // ← holds the current filtered+sorted list
 
 let activeFilters = [];
@@ -171,76 +353,119 @@ let FILTER_FIELDS = [
   "timestamp", "event", "edit_timestamp", "source_channel", "source_channel_name",
   "dest_channel", "dest_channel_name", "message_id", "media_type", "file_size_bytes",
   "original_size", "translated_size", "translation_time", "retry_count",
-  "posting_success", "api_error_code", "exception_message", "preview"
+  "posting_success", "api_error_code", "exception_message", "preview", "source_content",
+  "actions"
 ];
 
-function prettifyFieldName(field) {
-  if (field === "id") return "ID";
-  if (field === "api_error_code") return "API Error Code";
-  if (field === "timestamp") return "Timestamp";
-  if (field === "edit_timestamp") return "Edit Time";
-  if (field === "retry_count") return "Retries";
-  if (field === "posting_success") return "Success";
-  return field
-    .replace(/_/g, " ")
-    .replace(/\bid\b/i, "ID")
-    .replace(/\b(\w)/g, l => l.toUpperCase());
+function prettifyFieldName(field) {  // Short display names
+  const displayNames = {
+    "timestamp": "Time",
+    "event": "Event",
+    "edit_timestamp": "Edit Time",
+    "source_channel": "Source ID",
+    "source_channel_name": "Source Channel",
+    "dest_channel": "Dest ID",
+    "dest_channel_name": "Destination",
+    "message_id": "Msg ID",
+    "media_type": "Media",
+    "file_size_bytes": "File Size",
+    "original_size": "Orig Size",
+    "translated_size": "Trans Size",
+    "translation_time": "Trans Time",
+    "retry_count": "Retries",
+    "posting_success": "Status",
+    "api_error_code": "Error Code",
+    "exception_message": "Error",
+    "preview": "Preview",
+    "source_content": "Source",
+    "actions": "Actions"
+  };
+
+  // Full names for tooltips
+  const tooltips = {
+    "timestamp": "When the event occurred",
+    "event": "Type of event",
+    "edit_timestamp": "When the event was last edited",
+    "source_channel": "Source channel ID",
+    "source_channel_name": "Source channel name",
+    "dest_channel": "Destination channel ID",
+    "dest_channel_name": "Destination channel name",
+    "message_id": "Message ID",
+    "media_type": "Type of media attached",
+    "file_size_bytes": "Size of attached file in bytes",
+    "original_size": "Original message size",
+    "translated_size": "Translated message size",
+    "translation_time": "Time taken to translate",
+    "retry_count": "Number of retry attempts",
+    "posting_success": "Whether posting succeeded",
+    "api_error_code": "API error code if any",
+    "exception_message": "Exception message if any",
+    "preview": "Preview of translated message",
+    "source_content": "Original message content",
+    "actions": "Edit or view details"
+  };
+
+  const name = displayNames[field] || field;
+
+  return {
+    short: name,  // Short name for table header
+    tooltip: tooltips[field] || name // Fallback tooltip to the formatted name
+  };
 }
 
 function getVisibleFields() {
   const stored = localStorage.getItem(FIELDS_KEY);
   if (stored) return JSON.parse(stored);
-  return allFields.filter(f => f !== "exception_message" && f !== "previous_size" && f !== "new_size");
+  // Default minimal set of visible fields
+  return [
+    "timestamp",
+    "event",
+    // "source_channel", // ID might be too much for default view
+    "source_channel_name",
+    // "dest_channel",   // ID might be too much for default view
+    "dest_channel_name",
+    "message_id",
+    "posting_success",
+    "preview",        // Translated message from event
+    "actions"         // Always include actions column
+  ];
 }
-function setVisibleFields(arr) { localStorage.setItem(FIELDS_KEY, JSON.stringify(arr)); }
+
+function setVisibleFields(arr) { 
+  // Ensure actions column is always included
+  if (!arr.includes("actions")) {
+    arr.push("actions");
+  }
+  localStorage.setItem(FIELDS_KEY, JSON.stringify(arr)); 
+}
 
 function getColumnOrder() {
   const stored = localStorage.getItem(ORDER_KEY);
-  if (stored) return JSON.parse(stored).filter(f => allFields.includes(f));
-  return allFields.slice();
+  // Ensure allFields is populated before filtering, or filter against a known full list initially
+  const defaultOrder = allFields.length > 0 ? allFields.slice() : FILTER_FIELDS.slice();
+  if (stored) {
+      const parsedOrder = JSON.parse(stored);
+      // Filter out any fields that might no longer exist
+      return parsedOrder.filter(f => defaultOrder.includes(f));
+  }
+  return defaultOrder;
 }
 function setColumnOrder(arr) { localStorage.setItem(ORDER_KEY, JSON.stringify(arr)); }
 
-function findCachedMessage(cache, channelId, messageId) {
-  if (!cache[channelId]) return null;
-  return cache[channelId].find(m => String(m.message_id) === String(messageId)) || null;
-}
-
 function updateModal(id, title, body, footer) {
-  document.getElementById(id + "-title").textContent = title;
-  document.querySelector("#" + id + " .modal-body").innerHTML = body;
-  let footerElem = document.querySelector("#" + id + " .modal-footer");
-  if (footerElem && footer !== undefined) footerElem.innerHTML = footer;
+  const titleEl = document.getElementById(id + "-title");
+  if (titleEl) titleEl.textContent = title;
+  
+  const bodyEl = document.querySelector("#" + id + " .modal-body");
+  if (bodyEl) bodyEl.innerHTML = body;
+  
+  const footerEl = document.querySelector("#" + id + " .modal-footer");
+  if (footerEl && footer !== undefined) footerEl.innerHTML = footer;
 }
 
-function showDetailsModal(event, cachedMsg) {
-  let html = `<div class="mb-2"><b>Event Data:</b></div>
-    <pre class="bg-slate-100 border border-slate-200 rounded-lg p-2 text-xs">${
-      escapeHtml(JSON.stringify(event,null,2))
-    }</pre>`;
-  if (cachedMsg && cachedMsg.html) {
-    const safe = escapeHtml(cachedMsg.html);
-    html += `<div class="mb-2 mt-4"><b>Cached Message:</b></div>
-    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 font-roboto text-base text-gray-800" style="white-space:pre-line;">${safe}</div>`;
-  }
-  updateModal("details-modal", "Event Details", html,
-    `<button onclick="closeModal('details-modal')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>`);
-  openModal("details-modal");
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function showPreviewModal(html) {
-  const safe = escapeHtml(html);
+function showPreviewModal(htmlContent) { // Renamed param for clarity
   updateModal("preview-modal", "Full Message Preview",
-    `<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 font-roboto text-base text-gray-800" style="white-space:pre-line;">${safe}</div>`,
+    `<div class="bg-slate-50 border border-slate-200 rounded-lg p-3 font-roboto text-base text-gray-800" style="white-space:pre-wrap; word-break:break-word;">${htmlContent}</div>`,
     `<button onclick="closeModal('preview-modal')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>`);
   openModal("preview-modal");
 }
@@ -248,58 +473,100 @@ function showPreviewModal(html) {
 function renderColumnChooserHtml() {
   const order = getColumnOrder();
   const visibleFields = getVisibleFields();
-  let html = "";
+  let html = `<div class="column-chooser-list">`;
   order.forEach(field => {
-    html += `
-      <div class="column-chooser-li flex items-center justify-between gap-4" data-field="${field}">
-        <span class="drag-handle text-xl flex-shrink-0"><i class="fa fa-grip-lines"></i></span>
-        <span class="flex-grow text-gray-700 font-medium select-none">${prettifyFieldName(field)}</span>
-        <input type="checkbox" class="form-checkbox accent-indigo-600 ml-2" ${
-          visibleFields.includes(field) ? "checked" : ""
-        } data-field="${field}">
-      </div>
-    `;
+    const isVisible = visibleFields.includes(field);
+    const fieldNameParts = prettifyFieldName(field); // Returns {short: ..., tooltip: ...}
+    const displayName = fieldNameParts.short;
+    const tooltipText = fieldNameParts.tooltip || '';
+    // Use string concatenation for HTML generation to avoid issues with backticks in Jinja context
+    html += 
+      '<div class="column-chooser-li" data-field="' + field + '" title="' + tooltipText + '">' +
+        '<div class="flex items-center gap-2">' +
+          '<i class="fas fa-grip-vertical drag-handle"></i>' +
+          '<label class="flex items-center gap-2 cursor-pointer">' +
+            '<input type="checkbox" data-field="' + field + '" ' + (isVisible ? 'checked' : '') + ' class="form-checkbox h-4 w-4 text-blue-600">' +
+            '<span class="select-none">' + displayName + '</span>' +
+          '</label>' +
+        '</div>' +
+      '</div>';
   });
+  html += '</div>';
   return html;
 }
 
 function showColumnChooser() {
   let chooserHtml = renderColumnChooserHtml();
-  updateModal("column-chooser-modal", "Customize Columns", `<div id="columnChooserList">${chooserHtml}</div>`,
-    `<button onclick="closeModal('column-chooser-modal')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>`);
+  // Use string concatenation for HTML generation
+  updateModal("column-chooser-modal", "Customize Columns", 
+    '<div class="mb-3 text-sm text-gray-600">' +
+      'Drag to reorder. Check to show. Default view shows essential fields.' +
+     '</div>' +
+     '<div id="columnChooserListContainer">' + chooserHtml + '</div>', 
+    '<button onclick="applyColumnChangesAndClose()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>' +
+     '<button onclick="closeModal(&#39;column-chooser-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 ml-2">Cancel</button>');
+  
   openModal("column-chooser-modal");
-  const list = document.getElementById("columnChooserList");
-  list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener("change", function () {
-      let field = this.getAttribute("data-field");
-      let fields = getVisibleFields();
-      if (this.checked && !fields.includes(field)) fields.push(field);
-      else if (!this.checked && fields.includes(field)) fields = fields.filter(f => f !== field);
-      setVisibleFields(fields);
-      updateTableColumnVisibility();
+  
+  const listContainer = document.getElementById("columnChooserListContainer");
+  const actualList = listContainer.querySelector(".column-chooser-list"); // Get the actual list element
+
+  listContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener("change", function() {
+      // Changes are applied on "Apply" button click now, direct application removed from here
     });
   });
-  Sortable.create(list, {
+
+  Sortable.create(actualList, { // Target the actual list for Sortable
     handle: ".drag-handle",
     animation: 180,
-    onEnd: () => {
-      const newOrder = Array.from(list.children).map(li => li.getAttribute("data-field"));
-      setColumnOrder(newOrder);
-      renderTable();
-      updateTableColumnVisibility();
-      showColumnChooser();
+    onEnd: function(evt) {
+      // Order is also applied on "Apply" button click
     }
   });
 }
 
+function applyColumnChangesAndClose() {
+    const listContainer = document.getElementById("columnChooserListContainer");
+    const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
+    let newVisibleFields = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            newVisibleFields.push(cb.getAttribute("data-field"));
+        }
+    });
+    setVisibleFields(newVisibleFields);
+
+    const orderedElements = listContainer.querySelectorAll(".column-chooser-li");
+    const newOrder = Array.from(orderedElements).map(el => el.getAttribute("data-field"));
+    setColumnOrder(newOrder);
+    
+    renderTable(); 
+    updateTableColumnVisibility(); 
+    closeModal('column-chooser-modal');
+}
+
+
 function compareValues(a, b, field) {
   if (field === "timestamp" || field === "edit_timestamp") {
-    return new Date(a||0) - new Date(b||0);
+    const dateA = a ? new Date(a) : new Date(0); 
+    const dateB = b ? new Date(b) : new Date(0);
+    return dateA - dateB;
   }
-  if (!isNaN(Number(a)) && !isNaN(Number(b)) && a !== "" && b !== "") {
-    return Number(a) - Number(b);
+  if (field === "posting_success") {
+    const valA = a === true ? 1 : (a === false ? 0 : -1); 
+    const valB = b === true ? 1 : (b === false ? 0 : -1);
+    return valA - valB;
   }
-  return (a||"").toString().localeCompare((b||"").toString());
+
+  const numA = parseFloat(a);
+  const numB = parseFloat(b);
+
+  if (!isNaN(numA) && !isNaN(numB) && String(a).match(/^\d+(\.\d+)?$/) && String(b).match(/^\d+(\.\d+)?$/) ) {
+    return numA - numB;
+  }
+  
+  return (String(a ?? "")).toLowerCase().localeCompare(String(b ?? "").toLowerCase());
 }
 
 function filterData(rawData) {
@@ -307,409 +574,347 @@ function filterData(rawData) {
     return activeFilters.every(filter => {
       const { field, operator, value } = filter;
       let eventValue = event[field];
-      if (field === "preview" && !eventValue) {
-        let cachedMsg = findCachedMessage(cacheData, event.dest_channel, event.message_id) ||
-                        findCachedMessage(cacheData, event.source_channel, event.message_id);
-        eventValue = cachedMsg && cachedMsg.html ? cachedMsg.html : "";
+      
+      if (field === "source_content") {
+          const sourceMsg = event.source_channel && event.message_id ? 
+                            findCachedMessage(String(event.source_channel), String(event.message_id)) : null;
+          eventValue = sourceMsg ? (sourceMsg.text || sourceMsg.caption || "") : "";
       }
+
+      if (typeof eventValue === 'boolean') {
+        eventValue = String(eventValue); 
+      }
+      eventValue = eventValue ?? "";
+
+
+      const filterValues = value.split(",").map(v => v.trim().toLowerCase());
+      const lowerEventValue = String(eventValue).toLowerCase();
+
       switch (operator) {
         case "IS":
-          return value.split(",").map(v => v.trim()).includes(String(eventValue));
+          return filterValues.includes(lowerEventValue);
         case "IS NOT":
-          return !value.split(",").map(v => v.trim()).includes(String(eventValue));
-        case "EXISTS":
-          return eventValue !== undefined && eventValue !== null && eventValue !== "";
-        case "DOES NOT EXIST":
-          return eventValue === undefined || eventValue === null || eventValue === "";
+          return !filterValues.includes(lowerEventValue);
+        case "EXISTS": 
+          return lowerEventValue !== "";
+        case "DOES NOT EXIST": 
+          return lowerEventValue === "";
         default: return true;
       }
     });
   });
 }
 
-function renderTable(data0) {
+function renderTable() {
   const order = getColumnOrder();
   const visibleFields = getVisibleFields();
-  const headRow = document.getElementById("eventsTableHeadRow");
-  headRow.innerHTML = order.map(f =>
-    `<th class="sortable-ch col-${f} ${sortState.column===f?'sorted':''}" data-field="${f}" draggable="true">
-      ${prettifyFieldName(f)}
-      ${sortState.column === f
-        ? (sortState.dir === 1
-            ? '<span class="sort-arrow">▲</span>'
-            : '<span class="sort-arrow">▼</span>')
-        : ''}
-    </th>`
-  ).join("") 
-    + '<th style="min-width:90px;">Details</th>'
-    + '<th style="min-width:90px;">Edit</th>';
+  
+  let table = document.getElementById("eventsTable");
+  if (!table) { console.error("Table element #eventsTable not found!"); return; }
 
-  // Attach click handlers for sorting on each header
-  order.forEach((f, i) => {
-    const th = headRow.querySelector(`th[data-field="${f}"]`);
-    th.onclick = function(evt) {
-      if (evt.target.classList.contains("drag-handle") || evt.target.closest(".drag-handle")) return;
-      if (sortState.column === f) { sortState.dir = -sortState.dir; }
-      else { sortState.column = f; sortState.dir = 1; }
-      renderTable();
-    };
-  });
-
-  // 1) Start with raw or passed-in data
-  let events = data0 || eventsData;
-  // 2) Apply filters
-  events = filterData(events);
-  // 3) Apply sort
-  if (sortState.column && allFields.includes(sortState.column)) {
-    events = [...events].sort((a, b) => sortState.dir * compareValues(
-      a[sortState.column], b[sortState.column], sortState.column
-    ));
+  let head = table.querySelector("thead");
+  if (!head) {
+      head = document.createElement("thead");
+      table.appendChild(head);
   }
-  // 4) Store into the global displayedEvents, so click-handlers know the correct row order
-  displayedEvents = events;
+  head.innerHTML = '<tr id="eventsTableHeadRow"></tr>'; 
+  const headRow = head.querySelector("#eventsTableHeadRow");
 
+  order.forEach(field => {
+    if (!visibleFields.includes(field)) return;
+    const fieldNameParts = prettifyFieldName(field);
+    const th = document.createElement("th");
+    // Use string concatenation for className and innerHTML
+    th.className = 'col-header col-' + field;
+    th.dataset.field = field;
+    th.title = fieldNameParts.tooltip || fieldNameParts.short;
+    th.innerHTML = fieldNameParts.short + ' <span class="sort-arrow"></span>';
+    th.addEventListener("click", () => {
+      if (sortState.column === field) {
+        sortState.dir *= -1;
+      } else {
+        sortState.column = field;
+        sortState.dir = 1;
+      }
+      displayedEvents.sort((a, b) => compareValues(a[field], b[field], field) * sortState.dir);
+      if (field === "source_content") {
+          displayedEvents.sort((a, b) => {
+              const msgA = a.source_channel && a.message_id ? findCachedMessage(String(a.source_channel), String(a.message_id)) : null;
+              const valA = msgA ? (msgA.text || msgA.caption || "") : "";
+              const msgB = b.source_channel && b.message_id ? findCachedMessage(String(b.source_channel), String(b.message_id)) : null;
+              const valB = msgB ? (msgB.text || msgB.caption || "") : "";
+              return compareValues(valA, valB, field) * sortState.dir;
+          });
+      }
+      renderTableBody(displayedEvents);
+      updateSortArrows();
+    });
+    headRow.appendChild(th);
+  });
+  updateSortArrows(); 
+
+  displayedEvents = filterData(eventsData);
+  if (sortState.column === "timestamp" && eventsData.length > 0) {
+      displayedEvents.sort((a, b) => compareValues(a.timestamp, b.timestamp, "timestamp") * sortState.dir);
+  }
+  renderTableBody(displayedEvents);
+}
+
+function updateSortArrows() {
+  document.querySelectorAll("#eventsTableHeadRow th").forEach(th => {
+    const arrow = th.querySelector(".sort-arrow");
+    if (!arrow) return;
+    if (th.dataset.field === sortState.column) {
+      arrow.innerHTML = sortState.dir === 1 ? "▲" : "▼";
+    } else {
+      arrow.innerHTML = "";
+    }
+  });
+}
+
+function renderTableBody(data) {
   const tbody = document.getElementById("eventsTbody");
-  tbody.innerHTML = "";
+  if (!tbody) { console.error("Tbody element #eventsTbody not found!"); return; }
+  tbody.innerHTML = ""; 
 
-  events.forEach((event, rowidx) => {
-    const sourceChannel = String(event.source_channel);
-    const destChannel = String(event.dest_channel);
-    const messageId = String(event.message_id || "");
-    let cachedMsg = findCachedMessage(cacheData, destChannel, messageId) ||
-                    findCachedMessage(cacheData, sourceChannel, messageId);
+  const visibleFields = getVisibleFields();
+  const order = getColumnOrder();
 
-    const tds = order.map(f => {
-      let v = event[f];
-      if (f === "timestamp" || f === "edit_timestamp") {
-        v = v ? new Date(v).toLocaleString(undefined, { hour12: false }) : "";
-      }
-      if (f === "preview" || (f === "html" && cachedMsg && cachedMsg.html)) {
-        let lines = (cachedMsg && cachedMsg.html
-                      ? cachedMsg.html.split(/\n/).filter(l => l.trim() !== "")
-                      : []);
-        let preview = lines.slice(0, 2).join(" ");
-        v = cachedMsg && cachedMsg.html
-          ? `<div class="preview-lineclamp" title="Click to expand"
-                 data-fullhtml='${escapeHtml(cachedMsg.html).replace(/'/g, "&#39;")}'><!-- store safely -->
-                 ${preview}
-             </div>`
-          : "";
-      }
-      if (f === "posting_success") {
-        v = v === true ? "✔️" : v === false ? "❌" : "";
-      }
-      if (f === "translation_time" && v !== undefined && v !== null && v !== "") {
-        v = parseFloat(v).toFixed(3);
-      } else if (typeof v === "number") {
-        v = isNaN(v) ? "" : v;
-      }
-      if (v === null || v === undefined) v = "";
-      return `<td class="col-${f}">${v}</td>`;
-    }).join('');
+  data.forEach(event => {
+    const row = tbody.insertRow();
+    row.className = "event-row"; 
+    row.addEventListener('click', (e) => {
+        if (e.target.closest('button, a, input, .preview-lineclamp')) {
+            return;
+        }
+        showDetailsModal(event); 
+    });
 
-    tbody.innerHTML += `
-      <tr class="group" data-idx="${rowidx}">
-        ${tds}
-        <td class="text-right">
-          <button class="show-details-btn text-blue-600 hover:text-blue-900">Details</button>
-        </td>
-        <td class="text-center">
-          <button class="show-edit-btn text-gray-600 hover:text-gray-900">
-            <i class="fa fa-edit"></i>
-          </button>
-        </td>
-      </tr>
+    // Add cells for all visible fields
+    order.forEach(field => {
+      if (!visibleFields.includes(field)) return;
+      const cell = row.insertCell();
+      cell.className = "col-" + field;
+
+      let cellValue = event[field];
+      if (field === "posting_success") {
+        cellValue = cellValue ? '<span class="success-badge">OK</span>' : '<span class="error-badge">FAIL</span>';
+      } else if (field === "preview" && typeof cellValue === "string") {
+        cellValue = `<button class="preview-lineclamp" onclick="event.stopPropagation(); showPreviewModal(\`${cellValue.replace(/`/g, '\\`')}\`)">${cellValue}</button>`;
+      }
+      cell.innerHTML = cellValue ?? "";
+      
+      if (cell.className.includes("col-message_id") || cell.className.includes("col-retry_count")) {
+        cell.style.textAlign = "right";
+      }
+    });
+
+    // Add action buttons cell
+    const actionCell = row.insertCell();
+    actionCell.className = "text-right whitespace-nowrap px-4";
+    actionCell.style.width = "120px";
+    actionCell.innerHTML = `
+      <button 
+        onclick="event.stopPropagation(); showEditModal(${JSON.stringify(event).replace(/"/g, '&quot;')})" 
+        class="text-blue-600 hover:text-blue-800 font-medium text-sm px-2 py-1 rounded hover:bg-blue-50"
+        title="Edit event">
+        <i class="fas fa-edit"></i>
+      </button>
+      <button 
+        onclick="event.stopPropagation(); showDetailsModal(${JSON.stringify(event).replace(/"/g, '&quot;')})"
+        class="text-gray-600 hover:text-gray-800 font-medium text-sm px-2 py-1 rounded hover:bg-gray-50"
+        title="View details">
+        <i class="fas fa-info-circle"></i>
+      </button>
     `;
   });
-
-  updateTableColumnVisibility();
 }
 
-// Hide or show columns based on localStorage settings
+
 function updateTableColumnVisibility() {
-  const visibleFields = getVisibleFields();
-  allFields.forEach(f => {
-    document.querySelectorAll(".col-" + f).forEach(el => {
-      el.style.display = visibleFields.includes(f) ? "" : "none";
-    });
+  renderTable(); 
+}
+
+//==========================================================================================
+//  → FILTERS
+//==========================================================================================
+function addFilter() {
+  const filterId = 'filter-' + Date.now();
+  // Use string concatenation for HTML generation
+  const filterHtml = 
+    '<div id="' + filterId + '" class="filter-bar-row p-2 border rounded mb-2 bg-slate-50">' +
+      '<select class="filter-field form-select form-select-sm">' +
+        FILTER_FIELDS.map(f => '<option value="' + f + '">' + prettifyFieldName(f).short + '</option>').join('') +
+      '</select>' +
+      '<select class="filter-operator form-select form-select-sm">' +
+        FILTER_OPERATORS.map(op => '<option value="' + op + '">' + op + '</option>').join('') +
+      '</select>' +
+      '<input type="text" class="filter-value form-input form-input-sm flex-grow" placeholder="Value (comma-sep for IS/IS NOT)">' +
+      '<button onclick="removeFilter(&#39;' + filterId + '&#39;)" class="text-red-500 hover:text-red-700 p-1 text-sm">' +
+        '<i class="fa fa-trash"></i>' +
+      '</button>' +
+    '</div>';
+  document.getElementById("filtersContainer").insertAdjacentHTML("beforeend", filterHtml);
+  
+  const newFilterElement = document.getElementById(filterId);
+  const inputs = newFilterElement.querySelectorAll("select, input");
+  inputs.forEach(input => input.addEventListener("change", applyFiltersAndRender));
+  newFilterElement.querySelector(".filter-value").addEventListener("keyup", applyFiltersAndRender);
+
+
+  activeFilters.push({ 
+    id: filterId, 
+    field: newFilterElement.querySelector(".filter-field").value, 
+    operator: newFilterElement.querySelector(".filter-operator").value, 
+    value: "" 
   });
+  applyFiltersAndRender();
+}
+
+function removeFilter(filterId) {
+  document.getElementById(filterId).remove();
+  activeFilters = activeFilters.filter(f => f.id !== filterId);
+  applyFiltersAndRender();
+}
+
+function applyFiltersAndRender() {
+  activeFilters = Array.from(document.querySelectorAll("#filtersContainer > div")).map(filterElement => ({
+    id: filterElement.id,
+    field: filterElement.querySelector(".filter-field").value,
+    operator: filterElement.querySelector(".filter-operator").value,
+    value: filterElement.querySelector(".filter-value").value
+  }));
+  
+  displayedEvents = filterData(eventsData);
+  if (sortState.column) {
+    displayedEvents.sort((a, b) => {
+        let valA = a[sortState.column];
+        let valB = b[sortState.column];
+        if (sortState.column === "source_content") {
+            const msgA = a.source_channel && a.message_id ? findCachedMessage(String(a.source_channel), String(a.message_id)) : null;
+            valA = msgA ? (msgA.text || msgA.caption || "") : "";
+            const msgB = b.source_channel && b.message_id ? findCachedMessage(String(b.source_channel), String(b.message_id)) : null;
+            valB = msgB ? (msgB.text || msgB.caption || "") : "";
+        }
+        return compareValues(valA, valB, sortState.column) * sortState.dir;
+    });
+  }
+  renderTableBody(displayedEvents);
 }
 
 
-/*==========================================================================================
-  → OVERRIDE showEditModal TO PREVENT TIMEZONE SHIFT
-  → This converts the ISO timestamp to a local “YYYY-MM-DDThh:mm:ss” string
-    before assigning it to <input type="datetime-local">.
-==========================================================================================*/
-function showEditModal(event) {
-  function toLocalDatetime(iso) {
-    if (!iso) return "";
-    const d = new Date(iso);
-    const pad = n => String(n).padStart(2, "0");
-    const year = d.getFullYear();
-    const month = pad(d.getMonth() + 1);
-    const day = pad(d.getDate());
-    const hours = pad(d.getHours());
-    const minutes = pad(d.getMinutes());
-    const seconds = pad(d.getSeconds());
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+//==========================================================================================
+//  → INITIALIZATION
+//==========================================================================================
+document.addEventListener("DOMContentLoaded", () => {
+  // console.log("Admin Events page script started."); // This console log is now at the top of the script
+  // Initialize cacheData for the modal script
+  // Ensure channelCacheData is populated before this line, or handle potential undefined state in events_edit_modal.js
+  if (typeof initializeCache === "function") {
+    initializeCache(channelCacheData || {}); // Uses the channelCacheData parsed from the data island
+  } else {
+    console.warn("initializeCache function not found. Ensure events_edit_modal.js is loaded and defines it.");
   }
 
-  // Populate each form field
-  document.getElementById("field-timestamp").value       = toLocalDatetime(event.timestamp);
-  document.getElementById("field-event").value           = event.event || "";
-  document.getElementById("field-edit_timestamp").value  = toLocalDatetime(event.edit_timestamp);
-
-  document.getElementById("field-source_channel").value       = event.source_channel || "";
-  document.getElementById("field-source_channel_name").value  = event.source_channel_name || "";
-  document.getElementById("field-dest_channel").value         = event.dest_channel || "";
-  document.getElementById("field-dest_channel_name").value    = event.dest_channel_name || "";
-  document.getElementById("field-message_id").value           = event.message_id || "";
-  document.getElementById("field-media_type").value           = event.media_type || "";
-  document.getElementById("field-file_size_bytes").value      = event.file_size_bytes || "";
-  document.getElementById("field-original_size").value        = event.original_size || "";
-  document.getElementById("field-translated_size").value      = event.translated_size || "";
-  document.getElementById("field-translation_time").value     = event.translation_time || "";
-  document.getElementById("field-retry_count").value          = event.retry_count || "";
-
-  document.getElementById("field-posting_success").checked    = !!event.posting_success;
-  document.getElementById("success-status").textContent       = event.posting_success ? "OK" : "FAIL";
-
-  document.getElementById("field-api_error_code").value       = event.api_error_code || "";
-  document.getElementById("field-exception_message").value    = event.exception_message || "";
-  document.getElementById("field-previous_size").value        = event.previous_size || "";
-  document.getElementById("field-new_size").value             = event.new_size || "";
-
-  openModal("edit-modal");
-}
-
-
-/*==========================================================================================
-  → saveEdit(): read form, POST to /admin/events/edit, then reload data
-==========================================================================================*/
-async function saveEdit() {
-  // Gather all form values
-  const getVal = id => document.getElementById(id).value;
-  const data = {
-    timestamp:        getVal("field-timestamp"),
-    event:            getVal("field-event"),
-    edit_timestamp:   getVal("field-edit_timestamp"),
-    source_channel:   getVal("field-source_channel"),
-    source_channel_name: getVal("field-source_channel_name"),
-    dest_channel:     getVal("field-dest_channel"),
-    dest_channel_name: getVal("field-dest_channel_name"),
-    message_id:       getVal("field-message_id"),
-    media_type:       getVal("field-media_type"),
-    file_size_bytes:  parseInt(getVal("field-file_size_bytes")) || 0,
-    original_size:    parseInt(getVal("field-original_size")) || 0,
-    translated_size:  parseInt(getVal("field-translated_size")) || 0,
-    translation_time: parseFloat(getVal("field-translation_time")) || 0,
-    retry_count:      parseInt(getVal("field-retry_count")) || 0,
-    posting_success:  document.getElementById("field-posting_success").checked,
-    api_error_code:   parseInt(getVal("field-api_error_code")) || null,
-    exception_message: getVal("field-exception_message"),
-    previous_size:    parseInt(getVal("field-previous_size")) || 0,
-    new_size:         parseInt(getVal("field-new_size")) || 0
-  };
-
-  try {
-    const resp = await fetch("/admin/events/edit", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(data)
-    });
-    const result = await resp.json();
-    if (resp.ok && result.status === "ok") {
-      closeModal("edit-modal");
-      // Re-fetch the latest 100 events and re-render table
-      const detailResp = await fetch("/admin/events/detail");
-      const json = await detailResp.json();
-      eventsData = json.events_last_100 || [];
-      renderTable();
-    } else {
-      alert("Failed to save changes.");
-    }
-  } catch (err) {
-    console.error("Save error:", err);
-    alert("An error occurred while saving.");
-  }
-}
-
-
-/*==========================================================================================
-  → INITIALIZATION: Fetch data, render table, attach delegated click handlers
-==========================================================================================*/
-document.addEventListener("DOMContentLoaded", function () {
-  document.getElementById("openColumnChooser").addEventListener("click", showColumnChooser);
-
-  // FILTER UI
-  const addFilterBtn = document.getElementById("addFilterBtn");
-  const filtersContainer = document.getElementById("filtersContainer");
-
-  function renderFilterRow(filter = null) {
-    const filterRow = document.createElement("div");
-    filterRow.className = "filter-bar-row";
-
-    // Field selector
-    const fieldSelect = document.createElement("select");
-    fieldSelect.className = "border px-2 py-1 rounded";
-    FILTER_FIELDS.forEach(field => {
-      const option = document.createElement("option");
-      option.value = field;
-      option.textContent = prettifyFieldName(field);
-      fieldSelect.appendChild(option);
-    });
-
-    // Operator selector
-    const operatorSelect = document.createElement("select");
-    operatorSelect.className = "border px-2 py-1 rounded";
-    FILTER_OPERATORS.forEach(op => {
-      const option = document.createElement("option");
-      option.value = op;
-      option.textContent = op;
-      operatorSelect.appendChild(option);
-    });
-
-    // Value input
-    const valueInput = document.createElement("input");
-    valueInput.type = "text";
-    valueInput.placeholder = "Value(s)";
-    valueInput.className = "border px-2 py-1 rounded";
-    valueInput.style.minWidth = "110px";
-
-    // Remove button
-    const removeBtn = document.createElement("button");
-    removeBtn.textContent = "✕";
-    removeBtn.className = "ml-2 bg-red-500 text-white px-2 py-1 rounded";
-
-    // Restore filter values if editing
-    if (filter) {
-      fieldSelect.value = filter.field;
-      operatorSelect.value = filter.operator;
-      valueInput.value = filter.value;
-      if (filter.operator === "EXISTS" || filter.operator === "DOES NOT EXIST") {
-        valueInput.disabled = true;
-        valueInput.value = "";
+  fetch("{{ url_for('admin_stats_bp.admin_stats_detail') }}")
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    }
-
-    filterRow.appendChild(fieldSelect);
-    filterRow.appendChild(operatorSelect);
-    filterRow.appendChild(valueInput);
-    filterRow.appendChild(removeBtn);
-    filtersContainer.appendChild(filterRow);
-
-    function updateFilter() {
-      const field = fieldSelect.value;
-      const operator = operatorSelect.value;
-      const value = valueInput.value.trim();
-      const idx = activeFilters.findIndex(f => f.element === filterRow);
-      const obj = { field, operator, value, element: filterRow };
-
-      if (idx > -1) activeFilters[idx] = obj;
-      else activeFilters.push(obj);
-
-      renderTable();
-    }
-
-    fieldSelect.addEventListener("change", updateFilter);
-    operatorSelect.addEventListener("change", () => {
-      if (operatorSelect.value === "EXISTS" || operatorSelect.value === "DOES NOT EXIST") {
-        valueInput.disabled = true;
-        valueInput.value = "";
-      } else {
-        valueInput.disabled = false;
-      }
-      updateFilter();
-    });
-    valueInput.addEventListener("input", updateFilter);
-
-    removeBtn.addEventListener("click", () => {
-      filtersContainer.removeChild(filterRow);
-      activeFilters = activeFilters.filter(f => f.element !== filterRow);
-      renderTable();
-    });
-
-    updateFilter();
-  }
-
-  addFilterBtn.addEventListener("click", () => renderFilterRow());
-
-  // Fetch data and initialize table
-  fetch("/admin/cache/json")
-    .then(resp => resp.json())
-    .then(cache => {
-      cacheData = cache;
-      return fetch("/admin/events/detail");
+      return response.json();
     })
-    .then(response => response.json())
     .then(data => {
-      eventsData = data.events_last_100 || [];
-      let fieldSet = new Set();
-      eventsData.forEach(ev => Object.keys(ev).forEach(k => fieldSet.add(k)));
-
-      if (eventsData.some(ev => {
-        let src = String(ev.source_channel), dst = String(ev.dest_channel),
-            mid = String(ev.message_id || "");
-        return findCachedMessage(cacheData, dst, mid) ||
-               findCachedMessage(cacheData, src, mid);
-      })) {
-        fieldSet.add("preview");
+      if (data.error) {
+        console.error("Error from server:", data.error);
+        alert("Error fetching events: " + data.error);
+        return;
       }
-      allFields = Array.from(fieldSet).filter(f => f !== "event_type");
+      eventsData = data.events_last_100 || []; // Correctly access the array
+      console.log("Fetched events data:", eventsData);
 
-      const order = [
-        "timestamp", "event", "edit_timestamp", "source_channel", "source_channel_name",
-        "dest_channel", "dest_channel_name", "message_id", "media_type", "file_size_bytes",
-        "original_size", "translated_size", "translation_time", "retry_count", "posting_success",
-        "api_error_code", "exception_message", "preview"
-      ];
-      allFields.sort((a, b) => {
-        let ia = order.indexOf(a), ib = order.indexOf(b);
-        if (ia === -1) ia = 999;
-        if (ib === -1) ib = 999;
-        return ia - ib || a.localeCompare(b);
+      if (eventsData.length > 0) {
+        allFields = Object.keys(eventsData[0] || {});
+      } else {
+        // If eventsData is empty, use FILTER_FIELDS as a fallback for allFields
+        // This ensures the column chooser can still be populated even with no data
+        allFields = FILTER_FIELDS.slice(); 
+        console.warn("No events data received, using default fields for column chooser.");
+      }
+      
+      // Initialize or update column order based on potentially new allFields
+      let currentOrder = getColumnOrder();
+      // Add any new fields from allFields to the currentOrder if they don't exist
+      allFields.forEach(field => {
+        if (!currentOrder.includes(field)) {
+          currentOrder.push(field);
+        }
       });
+      // Remove any fields in currentOrder that are no longer in allFields (optional, depends on desired behavior)
+      currentOrder = currentOrder.filter(field => allFields.includes(field));
+      setColumnOrder(currentOrder);
 
-      let userOrder = getColumnOrder();
-      allFields.forEach(f => { if (!userOrder.includes(f)) userOrder.push(f); });
-      userOrder = userOrder.filter(f => allFields.includes(f));
-      setColumnOrder(userOrder);
+      // Initialize visible fields, ensuring they are a subset of allFields
+      let visibleFields = getVisibleFields();
+      visibleFields = visibleFields.filter(field => allFields.includes(field));
+      // If no visible fields are set or valid, default to a subset of allFields or a predefined minimal set
+      if (visibleFields.length === 0 && allFields.length > 0) {
+          // Default to first 5 fields or a specific set
+          const defaultVisible = ["timestamp", "event", "source_channel_name", "dest_channel_name", "preview"];
+          visibleFields = allFields.filter(f => defaultVisible.includes(f));
+          if (visibleFields.length === 0) visibleFields = allFields.slice(0, Math.min(5, allFields.length));
+      }
+      setVisibleFields(visibleFields);
+
 
       renderTable();
-      updateTableColumnVisibility();
+      updateTableColumnVisibility(); // Ensure columns are correctly shown/hidden
+    })
+    .catch(error => {
+      console.error("Error fetching events data:", error);
+      // Display a user-friendly error message
+      const container = document.getElementById("admin-stats");
+      if (container) {
+        container.innerHTML = `
+          <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong class="font-bold">Error!</strong>
+            <span class="block sm:inline">Could not load event data. Please try again later.</span>
+            <p class="text-sm mt-1">Details: ${error.message}</p>
+          </div>
+        `;
+      }
     });
 
-  // DELEGATED CLICK HANDLER for Details / Edit / Preview
-  document.getElementById("eventsTbody").addEventListener("click", function(e) {
-    // DETAILS
-    if (e.target.closest(".show-details-btn")) {
-      const tr = e.target.closest("tr");
-      if (!tr) return;
-      const idx = Number(tr.getAttribute("data-idx"));
-      const event = displayedEvents[idx];  // ← now using filtered+sorted array
-      const messageId = String(event.message_id || "");
-      const cachedMsg = findCachedMessage(cacheData, String(event.dest_channel), messageId)
-                      || findCachedMessage(cacheData, String(event.source_channel), messageId);
-      showDetailsModal(event, cachedMsg);
-    }
-
-    // EDIT
-    if (e.target.closest(".show-edit-btn")) {
-      const tr = e.target.closest("tr");
-      if (!tr) return;
-      const idx = Number(tr.getAttribute("data-idx"));
-      const event = displayedEvents[idx];  // ← now using filtered+sorted array
-      showEditModal(event);
-    }
-
-    // PREVIEW CLICK (inside a cell) to open the full message
-    if (e.target.closest(".preview-lineclamp")) {
-      const clipped = e.target.closest(".preview-lineclamp");
-      const fullHtml = clipped.getAttribute("data-fullhtml") || "";
-      if (fullHtml) showPreviewModal(fullHtml);
-    }
-  });
+  document.getElementById("openColumnChooser").addEventListener("click", showColumnChooser);
+  document.getElementById("addFilterBtn").addEventListener("click", addFilter);
 });
+
+// Modal utilities (openModal, closeModal) 
+function openModal(id) {
+  const modal = document.getElementById(id);
+  const overlay = document.getElementById(id + "-overlay");
+  if (modal) {
+    modal.style.display = "block";
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+  }
+  if (overlay) {
+    overlay.style.display = "block";
+    overlay.classList.remove("hidden");
+  }
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  const overlay = document.getElementById(id + "-overlay");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+  }
+  if (overlay) {
+    overlay.style.display = "none";
+    overlay.classList.add("hidden");
+  }
+}
   </script>
 {% endblock %}

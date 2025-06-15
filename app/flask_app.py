@@ -1,22 +1,13 @@
-from flask import Flask, request, render_template, redirect, url_for, flash
 import os
 import sys
-# make sure project root is on sys.path so 'translator' can be found
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from datetime import datetime
-from translator.config import PROMPT_TEMPLATE_PATH
-
-# --- use absolute import for your blueprints etc. ---
+from flask import Flask, request, render_template, redirect, url_for, flash, Blueprint, jsonify, current_app
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
 from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
 from admin_config import admin_config_bp  
 from admin_manager import admin_manager_bp
 from admin_cache import admin_cache_bp
-from app.admin_events import admin_stats_bp
 from admin_logs import admin_logs_bp
 from aggregator import (
     build_summary,
@@ -25,9 +16,14 @@ from aggregator import (
     build_throughput_latency,
     load_messages
 )
+from app.admin_events import admin_stats_bp
+from translator.config import PROMPT_TEMPLATE_PATH
+# make sure project root is on sys.path so 'translator' can be found
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 
-# use absolute import
 
 app = Flask(__name__)
 app.config["DEBUG"] = True
@@ -35,15 +31,18 @@ app.secret_key = os.getenv("SECRET_KEY") or "dev_secret_key"  # ensure non-empty
 
 # --- Setup Flask-Login ---
 login_manager = LoginManager()
-login_manager.login_view = "login"
 login_manager.init_app(app)
+login_manager.login_view = "login"  # type: ignore
 
 # --- Static Admin User ---
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 
 
 class Admin(UserMixin):
-    id = "admin"
+    """Admin user class for Flask-Login authentication."""
+
+    def __init__(self):
+        self.id = "admin"
 
     def get_id(self):
         return self.id
@@ -51,7 +50,7 @@ class Admin(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id == Admin.id:
+    if user_id == "admin":
         return Admin()
     return None
 
@@ -79,9 +78,7 @@ def logout():
     logout_user()
     flash("Logged out 👋", "info")
     return redirect(url_for("login"))
-
-# --- Metrics API Blueprint ---
-from flask import Blueprint, jsonify, current_app
+ 
 
 bp = Blueprint("metrics", __name__, url_prefix="/api")
 

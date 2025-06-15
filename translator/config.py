@@ -178,7 +178,7 @@ CONFIG = Config()
 
 # Paths and defaults
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "cache")
-STATS_PATH = os.path.join(CACHE_DIR, "events.json")
+EVENTS_PATH = os.path.join(CACHE_DIR, "events.json")
 STORE_PATH = os.path.join(CACHE_DIR, "channel_cache.json")
 DEFAULT_STATS = {"messages": []}
 MESSAGES_LIMIT = 9

@@ -1,22 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Channel Cache Viewer</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Font Awesome for sort icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <!-- List.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/2.3.1/list.min.js"></script>
-</head>
-<body class="bg-gray-100 min-h-screen">
-  <div class="container mx-auto mt-8" id="cache-table-app">
+{% extends "base.html" %}
+
+{% block title %}Channel Cache Viewer{% endblock %}
+
+{% block head %}
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<!-- List.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/2.3.1/list.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="cache-table-app" x-data="{ showClearDialog: false, selectedChannel: '' }">
     <div class="flex items-center mb-6">
       {% set href = '/admin' %}
       {% include 'components/back_button.html' %}
       <h1 class="text-3xl font-bold mt-[-5px]">Channel Cache</h1>
+      <div class="ml-auto">
+        <button @click="showClearDialog = true" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
+          <i class="fas fa-trash-alt mr-2"></i>Clear Cache
+        </button>
+      </div>
     </div>
     <hr class="mb-6">
+
+    <!-- Clear Cache Dialog -->
+    <div x-show="showClearDialog" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+      <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4"
+           @click.away="showClearDialog = false">
+        <h3 class="text-lg font-semibold mb-4">Clear Cache</h3>
+        <p class="mb-4">Choose which cache to clear:</p>
+        <div class="mb-4">
+          <label class="block mb-2">
+            <input type="radio" x-model="selectedChannel" value="" class="mr-2">
+            All Channels
+          </label>
+          {% for cid, cname in channel_id_to_name.items() %}
+          <label class="block mb-2">
+            <input type="radio" x-model="selectedChannel" value="{{ cid }}" class="mr-2">
+            {{ cname }}
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex justify-end gap-3">
+          <button @click="showClearDialog = false" 
+                  class="px-4 py-2 border rounded hover:bg-gray-100">
+            Cancel
+          </button>
+          <button @click="clearCache(selectedChannel)" 
+                  class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            Clear Cache
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div class="bg-white p-4 rounded shadow mb-6 flex flex-wrap gap-4 items-end">
       <div>
@@ -61,11 +104,9 @@
                   <i class="fas fa-sort text-gray-400"></i>
                 </span>
               </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Source
-              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
               <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
-              <th class="px-4 py-3"></th>
+              <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody id="cacheTbody" class="list bg-white divide-y divide-gray-200">
@@ -79,7 +120,7 @@
                     <td class="px-4 py-3 date_formatted text-xs text-gray-700">{{ msg.date_formatted }}</td>
                     <td class="px-4 py-3">
                       {% if msg.source_channel_id %}
-                        {% set source_card = cache_data[msg.source_channel_id|string] if cache_data[msg.source_channel_id|string] is defined else None %}
+                        {% set source_card = cache_data[msg.source_channel_id|string] if msg.source_channel_id|string in cache_data else None %}
                         {% if source_card %}
                           <button type="button"
                             class="text-blue-600 hover:underline bg-transparent px-0 py-0 border-none transition-colors duration-200 go-to-source-link"
@@ -93,20 +134,13 @@
                         &mdash;
                       {% endif %}
                     </td>
-                    <td class="px-4 py-3 align-top">
-                      <div class="message-preview bg-transparent font-mono text-sm leading-snug text-gray-800 relative transition-all duration-300 overflow-x-auto p-0" style="max-height:7em;">
-                        <div class="message-content" style="white-space: pre-line; overflow:hidden; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical;">
-                          {{ msg.html | safe }}
-                        </div>
-                      </div>
+                    <td class="px-4 py-3">
+                      <div class="max-w-md text-sm text-gray-600 whitespace-pre-wrap">{{ msg.text[:200] }}{% if msg.text|length > 200 %}...{% endif %}</div>
                     </td>
-                    <td class="px-4 py-3 text-center align-top">
-                      <button type="button"
-                        class="px-2 py-1 text-blue-600 hover:underline focus:outline-none show-modal-btn"
-                        data-message='{{ msg | tojson | safe }}'
-                        data-channel="{{ channel_id_to_name.get(channel_id, "Unknown") }}"
-                        data-channelid="{{ channel_id }}">
-                        More
+                    <td class="px-4 py-3 text-right">
+                      <button onclick="deleteMessage('{{ channel_id }}', '{{ msg.message_id }}')"
+                              class="text-red-600 hover:text-red-800 transition-colors">
+                        <i class="fas fa-trash"></i>
                       </button>
                     </td>
                   </tr>
@@ -117,110 +151,89 @@
         </table>
       </div>
     {% else %}
-      <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">No cache data found.</div>
+      <div class="bg-gray-50 p-8 rounded shadow text-center">
+        <p class="text-gray-600">No cached messages found.</p>
+      </div>
     {% endif %}
-  </div>
-
-<!-- Modal -->
-<dialog id="msgModal" class="rounded-lg shadow-lg w-full max-w-4xl">
-  <form method="dialog" class="bg-white rounded-lg max-h-[90vh] overflow-y-auto">
-    <div class="flex justify-between items-center border-b px-6 py-3">
-      <h5 class="text-xl font-semibold">Message Details</h5>
-      <button type="button" class="text-gray-400 hover:text-gray-600 text-2xl font-bold" onclick="document.getElementById('msgModal').close()">&times;</button>
-    </div>
-    <div class="px-8 py-6" id="msgModalBody">
-      <!-- Filled by JS -->
-    </div>
-    <div class="flex justify-end gap-2 border-t px-6 py-3">
-      <button type="button" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition" onclick="document.getElementById('msgModal').close()">Close</button>
-    </div>
-  </form>
-</dialog>
+</div>
 
 <script>
-function highlightCardById(id) {
-  const el = document.getElementById(id);
-  if (el) {
-    el.classList.add('ring-4', 'ring-blue-400', 'transition');
-    setTimeout(() => {
-      el.classList.remove('ring-4', 'ring-blue-400');
-    }, 1500);
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-}
-function highlightCardFromHash() {
-  if (window.location.hash.startsWith("#source-")) {
-    highlightCardById(window.location.hash.substring(1));
-  }
-}
-window.addEventListener('DOMContentLoaded', function() {
-  highlightCardFromHash();
-  window.addEventListener('hashchange', highlightCardFromHash);
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize List.js
+  const options = {
+    valueNames: ['channel_name', 'message_id', 'date_formatted']
+  };
+  const cacheList = new List('cache-table-app', options);
 
-  document.querySelectorAll('.go-to-source-link').forEach(function(link) {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      const targetId = link.getAttribute('data-target');
-      highlightCardById(targetId);
-      history.replaceState(null, '', '#' + targetId);
-    });
+  // Channel filter
+  const channelFilter = document.getElementById('channel_filter');
+  channelFilter.addEventListener('change', function(e) {
+    const channel = e.target.value;
+    window.location.href = channel ? `/admin/cache?channel=${channel}` : '/admin/cache';
   });
 
-  // List.js sorting & search
-  if (document.querySelector('#cacheTbody')) {
-    var options = {
-      valueNames: ['channel_name', 'message_id', 'date_formatted', 'message-content']
-    };
-    var cacheList = new List('cache-table-app', options);
-
-    document.getElementById('channel_filter').addEventListener('change', function () {
-      const cid = this.value;
-      window.location.search = cid ? ('?channel=' + encodeURIComponent(cid)) : '';
-    });
-  }
-  // Search sync
-  document.getElementById('searchQuery')?.addEventListener('input', function(e){
-    // List.js will react automatically via class="search"
-  });
-
-  // Modal show
-  document.querySelectorAll('.show-modal-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      let msg = {};
-      try { msg = JSON.parse(btn.getAttribute('data-message')); } catch(e) {}
-      const modal = document.getElementById('msgModal');
-      const body = document.getElementById('msgModalBody');
-      let details = `
-        <div class="mb-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-          <div class="text-sm text-gray-700"><b>Channel:</b> ${btn.getAttribute('data-channel')} <span class="text-xs text-gray-400 ml-2">${btn.getAttribute('data-channelid')}</span></div>
-          <div class="text-sm text-gray-700"><b>Message ID:</b> ${msg.message_id || ''}</div>
-          <div class="text-sm text-gray-700"><b>Date:</b> ${msg.date_formatted || ''}</div>
-          ${msg.source_channel_id ? `<div class="text-sm text-gray-700"><b>Source:</b> ${msg.source_channel_id} | ${msg.source_message_id}</div>` : ''}
-        </div>
-        <div class="mb-2 mt-4"><b>Full Message:</b></div>
-        <div class="whitespace-pre-wrap bg-slate-100 border border-slate-200 rounded-lg p-4 font-mono text-gray-800 text-base overflow-x-auto max-h-[450px]">${msg.html || ''}</div>
-      `;
-      body.innerHTML = details;
-      modal.showModal();
+  // Source link navigation
+  document.querySelectorAll('.go-to-source-link').forEach(link => {
+    link.addEventListener('click', function() {
+      const targetId = this.dataset.target;
+      const targetElement = document.getElementById(targetId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth' });
+        targetElement.classList.add('bg-yellow-100');
+        setTimeout(() => targetElement.classList.remove('bg-yellow-100'), 2000);
+      }
     });
   });
 });
-</script>
-<style>
-.message-preview {
-    display: -webkit-box;
-    -webkit-line-clamp: 6;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    max-height: 7em;
-    transition: max-height 0.3s;
-    position: relative;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+// Cache management functions
+function clearCache(channelId) {
+  const formData = new FormData();
+  if (channelId) {
+    formData.append('channel_id', channelId);
+  }
+
+  fetch('/admin/cache/clear', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert('Error clearing cache: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Failed to clear cache');
+  });
 }
-</style>
-</body>
-</html>
+
+function deleteMessage(channelId, messageId) {
+  if (!confirm('Are you sure you want to delete this message?')) {
+    return;
+  }
+
+  fetch(`/admin/cache/delete/${messageId}?channel_id=${channelId}`, {
+    method: 'DELETE'
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      const row = document.getElementById(`source-${channelId}-${messageId}`);
+      if (row) {
+        row.remove();
+      }
+    } else {
+      alert('Error deleting message: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Failed to delete message');
+  });
+}
+</script>
+{% endblock %}

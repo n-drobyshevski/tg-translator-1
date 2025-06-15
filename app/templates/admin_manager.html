@@ -1,12 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Message Manager</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+{% extends "base.html" %}
+
+{% block title %}Message Manager{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+{% endblock %}
+{% block header %}
+<div class="flex items-center w-full">
+  
+  
+        
+  <h1 class="page-title">
+    <span>Message Manager</span>
+  </h1>
+ 
+</div>
+{% endblock %}
+{% block content %}
     <style>
       body { font-family: 'Roboto', sans-serif; }
       .message-preview {
@@ -89,16 +100,10 @@
   </head>
   <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto mt-10 px-4 sm:px-6 lg:px-10 max-w-6xl">
-      <!-- Header + Back Button -->
-      <div class="flex items-center mb-8">
-        {% set href = '/admin' %}
-        {% include 'components/back_button.html' %}
-        <h1 class="text-3xl font-bold ml-2 tracking-tight ">Message Manager</h1>
-      </div>
-      <hr class="mb-8 border-blue-200" />
+      
 
       <!-- Step 1: Select Source Channel -->
-      <div class="section-panel">
+      <div class="section-panel h-full">
         <div class="step-title"><i class="fa-solid fa-filter"></i> 1. Select Source Channel</div>
         <form method="post" class="flex flex-col sm:flex-row sm:items-end sm:space-x-5 flex-wrap">
           <div class="flex-1 min-w-[200px]">
@@ -544,7 +549,5 @@
           tgtRaw.style.display    = showRaw ? 'block' : 'none';
           tgtBlock.style.display  = showRaw ? 'none'  : 'block';
         });
-      });
-    </script>
-  </body>
-</html>
+      });    </script>
+{% endblock %}

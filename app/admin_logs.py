@@ -10,14 +10,14 @@ admin_logs_bp = Blueprint("admin_logs_bp", __name__)
 def show_logs():
     log_path = os.path.join(CACHE_DIR, "bot.log")
     if not os.path.exists(log_path):
-        return render_template("admin_logs.html", log_lines=["Log file not found."])
+        return render_template("admin_logs.html", log_lines=["Log file not found."], active_page="logs")    
     try:
         # Show only the last 500 lines for performance
         with open(log_path, "r", encoding="utf-8") as f:
             lines = f.readlines()[-500:]
     except Exception as e:
         lines = [f"Error reading log file: {e}"]
-    return render_template("admin_logs.html", log_lines=lines)
+    return render_template("admin_logs.html", log_lines=lines, active_page="logs")
 
 @admin_logs_bp.route("/admin/logs/clear", methods=["POST"])
 @login_required

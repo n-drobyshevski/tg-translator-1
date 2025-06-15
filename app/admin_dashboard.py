@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from flask_login import login_required
 import logging
 import json
-from translator.config import STATS_PATH
+from translator.config import EVENTS_PATH
 
 admin_bp = Blueprint("admin_bp", __name__)
 logger = logging.getLogger(__name__)  # add logger
@@ -79,7 +79,7 @@ def admin_dashboard():
         "SHALTNOTKILL_CHANNEL": os.getenv("SHALTNOTKILL_CHANNEL", ""),
     }
     try:
-        with open(STATS_PATH, "r", encoding="utf-8") as f:
+        with open(EVENTS_PATH, "r", encoding="utf-8") as f:
             stats_json = json.load(f)
         messages = stats_json.get("messages", [])
         stats = compute_stats(messages)
@@ -97,4 +97,4 @@ def admin_dashboard():
             "busiest_pair_percent": 0,
         }
         
-    return render_template("admin_dashboard.html", info=info, stats=stats)
+    return render_template("admin_dashboard.html", info=info, stats=stats, active_page="dashboard")
