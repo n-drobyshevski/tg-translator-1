@@ -1,6 +1,7 @@
 // Cache data and lookup debugging - declared as var to be accessible across modules
 var cacheData = null;
 let currentEventObj = null;
+let originalValues = null; // Store original values for change detection
 
 function initCache(data) {
     console.log('Initializing cache with data:', data);
@@ -53,224 +54,506 @@ function formatFileSize(bytes) {
     return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-function showEditModal(eventObj, isReadOnly = false) {
-    console.log("showEditModal called with eventObj:", eventObj);
-    currentEventObj = eventObj;
-    // Use the correct modal id
-    const modalContainer = document.getElementById('edit-modal');
-    if (!modalContainer) {
-        console.error('Edit modal container not found!');
-        return;
-    }
-
-    // Helper function to safely set field value
-    const setFieldValue = (id, value, defaultValue = "") => {
-        const element = document.getElementById(id);
-        if (element) {
-            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
-                element.value = value || defaultValue;
-            } else {
-                element.textContent = value || defaultValue;
-            }
-        }
-    };
-
-    // Set modal title
-    const modalTitle = modalContainer.querySelector('.modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = isReadOnly ? 'Event Details' : 'Edit Event';
-    }
-
-    // Populate basic fields
-    setFieldValue("field-timestamp", toLocalDatetime(eventObj.timestamp));
-    setFieldValue("field-event", eventObj.event);
-    setFieldValue("field-edit_timestamp", toLocalDatetime(eventObj.edit_timestamp));
+// Track changed fields
+function trackChanges(formElement) {
+    const changes = {};
+    const formData = new FormData(formElement);
     
-    // Channel and message fields
-    setFieldValue("field-source_channel", eventObj.source_channel);
-    setFieldValue("field-source_channel_name", eventObj.source_channel_name);
-    setFieldValue("field-dest_channel", eventObj.dest_channel);
-    setFieldValue("field-dest_channel_name", eventObj.dest_channel_name);
-    setFieldValue("field-message_id", eventObj.message_id);
-    setFieldValue("field-dest_message_id", eventObj.dest_message_id);
-
-    // Status and Error Information
-    const statusElement = document.getElementById("field-status");
-    if (statusElement) {
-        statusElement.textContent = eventObj.status || "Unknown";
-        statusElement.className = `mt-1 p-2 rounded-md text-sm ${
-            eventObj.status === 'success' ? 'bg-green-100 text-green-800' :
-            eventObj.status === 'error' ? 'bg-red-100 text-red-800' :
-            eventObj.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-            'bg-gray-100 text-gray-800'
-        }`;
-    }
-
-    const errorElement = document.getElementById("field-error");
-    if (eventObj.error) {
-        errorElement.textContent = eventObj.error;
-        errorElement.style.display = "block";
-    } else {
-        errorElement.textContent = "No errors";
-        errorElement.classList.add("text-gray-500");
-    }
-
-    // Retry information
-    document.getElementById("field-retry-count").textContent = 
-        eventObj.retry_count ? `${eventObj.retry_count} attempts` : "No retries";
-
-    // Process Duration
-    const duration = eventObj.process_duration || 
-        (eventObj.end_time && eventObj.start_time ? 
-            new Date(eventObj.end_time) - new Date(eventObj.start_time) : null);
-    document.getElementById("field-process-duration").textContent = duration ? 
-        formatDuration(duration) : "N/A";
-
-    // Message Preview Sections
-    const sourceMessage = findCachedMessage(eventObj.source_channel, eventObj.message_id);
-    const sourcePreview = document.getElementById("source-message-preview");
-    if (sourcePreview) {
-        if (sourceMessage) {
-            sourcePreview.textContent = sourceMessage.text || sourceMessage.caption || "No text content";
-            if (sourceMessage.media) {
-                sourcePreview.innerHTML += `<div class="mt-2 text-blue-600">[Contains media: ${sourceMessage.media.type}]</div>`;
-            }
-        } else {
-            sourcePreview.textContent = "Message not found in cache";
-            sourcePreview.classList.add("text-gray-500", "italic");
+    for (const [key, value] of formData.entries()) {
+        if (originalValues[key] !== value) {
+            changes[key] = value;
         }
     }
-
-    const destMessage = findCachedMessage(eventObj.dest_channel, eventObj.dest_message_id);
-    const translatedPreview = document.getElementById("translated-message-preview");
-    if (translatedPreview) {
-        if (destMessage) {
-            translatedPreview.textContent = destMessage.text || destMessage.caption || "No text content";
-            if (destMessage.media) {
-                translatedPreview.innerHTML += `<div class="mt-2 text-blue-600">[Contains media: ${destMessage.media.type}]</div>`;
-            }
-        } else {
-            translatedPreview.textContent = "Message not found in cache";
-            translatedPreview.classList.add("text-gray-500", "italic");
-        }
-    }
-
-    // Media Section
-    const mediaSection = document.getElementById("media-section");
-    if (sourceMessage?.media || destMessage?.media) {
-        mediaSection.style.display = "block";
-        const media = sourceMessage?.media || destMessage?.media;
-        
-        document.getElementById("field-media-type").textContent = media.type || "Unknown";
-        document.getElementById("field-file-size").textContent = media.file_size ? 
-            formatFileSize(media.file_size) : "Unknown";
-        
-        if (media.duration) {
-            document.getElementById("field-media-duration").textContent = 
-                formatDuration(media.duration * 1000);
-        } else {
-            document.getElementById("field-media-duration").textContent = "N/A";
-        }
-
-        if (media.width && media.height) {
-            document.getElementById("field-resolution").textContent = 
-                `${media.width}×${media.height}`;
-        } else {
-            document.getElementById("field-resolution").textContent = "N/A";
-        }
-    } else {
-        mediaSection.style.display = "none";
-    }
-
-    // Show the modal
-    modalContainer.style.display = 'block';
+    
+    return Object.keys(changes).length > 0 ? changes : null;
 }
 
-// Function to show the details modal - reuses the edit modal with readonly fields
-function showDetailsModal(eventObj) {
-    console.log("showDetailsModal called with eventObj:", eventObj);
-    // Use the correct modal id
-    const modalContainer = document.getElementById('details-modal');
-    if (!modalContainer) {
-        console.error('Details modal container not found!');
+// Validate form fields
+function validateField(field) {
+    const value = field.value.trim();
+    const pattern = field.getAttribute('pattern');
+    
+    if (pattern && value) {
+        const regex = new RegExp(`^${pattern}$`);
+        if (!regex.test(value)) {
+            field.setCustomValidity(field.title || 'Invalid format');
+            return false;
+        }
+    }
+    
+    field.setCustomValidity('');
+    return true;
+}
+
+// Handle form submission
+async function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const changes = trackChanges(form);
+    
+    if (!changes) {
+        showToast('No changes to save', 'info');
         return;
     }
-    // Reuse showEditModal but make fields readonly
-    showEditModal(eventObj, true);
     
-    // Change modal title and buttons for details view
-    const modalTitle = document.querySelector('#modal .modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = 'Event Details';
-    }
-
-    const modalFooter = document.querySelector('#modal .modal-footer');
-    if (modalFooter) {
-        modalFooter.innerHTML = `
-            <button type="button" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md" 
-                    onclick="hideEditModal()">Close</button>`;
-    }
-
-    // Make all input fields readonly
-    const inputs = document.querySelectorAll('#modal input, #modal textarea');
-    inputs.forEach(input => {
-        input.readOnly = true;
-        input.classList.add('bg-gray-50');
+    // Validate all fields
+    let isValid = true;
+    form.querySelectorAll('input[pattern]').forEach(field => {
+        if (!validateField(field)) {
+            isValid = false;
+            field.classList.add('border-red-500');
+        } else {
+            field.classList.remove('border-red-500');
+        }
     });
-}
-
-function hideEditModal() {
-    const modalContainer = document.getElementById('modal');
-    if (modalContainer) modalContainer.style.display = 'none';
-    currentEventObj = null;
-}
-
-async function saveEventChanges() {
-    if (!currentEventObj) {
-        console.error('No event object to save');
+    
+    if (!isValid) {
+        showToast('Please correct the errors before saving', 'error');
         return;
     }
-
-    const updatedEvent = {
-        ...currentEventObj,
-        timestamp: new Date(document.getElementById("field-timestamp").value).toISOString(),
-        edit_timestamp: new Date(document.getElementById("field-edit_timestamp").value).toISOString(),
-        event: document.getElementById("field-event").value,
-        source_channel_name: document.getElementById("field-source_channel_name").value,
-        dest_channel_name: document.getElementById("field-dest_channel_name").value,
-    };
-
+    
     try {
-        const response = await fetch('/api/admin/events/update', {
+        // Show loading state
+        submitButton.disabled = true;
+        submitButton.innerHTML = `
+            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Saving...
+        `;
+        
+        // Send changes to server
+        const response = await fetch('/admin/events/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(updatedEvent)
+            body: JSON.stringify({
+                eventId: currentEventObj.id,
+                changes: changes
+            })
         });
-
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('Failed to save changes');
         }
-
-        const result = await response.json();
-        console.log('Save successful:', result);
+        
+        // Update current event object with changes
+        Object.assign(currentEventObj, changes);
+        
+        // Show success message
+        showToast('Changes saved successfully', 'success');
+        
+        // Close the modal
+        hideModal('edit-modal');
         
         // Refresh the events table
         if (typeof refreshEventsTable === 'function') {
             refreshEventsTable();
         }
-
-        hideEditModal();
     } catch (error) {
-        console.error('Error saving event:', error);
-        alert('Failed to save changes. Please try again.');
+        console.error('Error saving changes:', error);
+        showToast('Failed to save changes. Please try again.', 'error');
+    } finally {
+        // Reset button state
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'Save Changes';
     }
 }
 
-// Update "OK/FAIL" label whenever toggle changes
-document.addEventListener("input", function(e) {
-    if (e.target && e.target.id === "field-posting_success") {
-        document.getElementById("success-status").textContent = e.target.checked ? "OK" : "FAIL";
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-y-full z-50 ${
+        type === 'error' ? 'bg-red-500 text-white' :
+        type === 'success' ? 'bg-green-500 text-white' :
+        'bg-blue-500 text-white'
+    }`;
+    
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Animate in
+    setTimeout(() => {
+        toast.style.transform = 'translateY(0)';
+    }, 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.style.transform = 'translateY(full)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Helper function to safely set field value and handle readonly state
+function setFieldValue(modalId, fieldId, value, isReadOnly = false) {
+    const element = document.querySelector(`#${modalId} #${fieldId}`);
+    if (!element) {
+        console.warn(`Element ${fieldId} not found in modal ${modalId}`);
+        return;
     }
+
+    if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+        element.value = value || '';
+        element.disabled = isReadOnly;
+        
+        if (!isReadOnly) {
+            // Store original value for change tracking
+            originalValues = originalValues || {};
+            originalValues[element.name] = value;
+            
+            // Add validation event listeners
+            if (element.pattern) {
+                element.addEventListener('input', () => {
+                    validateField(element);
+                });
+                element.addEventListener('blur', () => {
+                    validateField(element);
+                });
+            }
+        }
+    } else {
+        element.textContent = value || '';
+    }
+}
+
+async function updateMessagePreview(container, content, mediaInfo = null) {
+    if (!container) return;
+
+    // Show loading state
+    container.innerHTML = `
+        <div class="loading-spinner">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+    `;
+
+    try {
+        // Process content asynchronously to not block the UI
+        const processedContent = await new Promise((resolve) => {
+            setTimeout(() => {
+                // If we have media info, show it first
+                let html = '';
+                  if (mediaInfo && mediaInfo.type && mediaInfo.type !== 'text') {
+                    html += `
+                        <div class="media-info">
+                            <strong>Media Type:</strong> ${mediaInfo.type}<br>
+                            ${mediaInfo.size ? `<strong>File Size:</strong> ${formatFileSize(mediaInfo.size)}<br>` : ''}
+                            ${mediaInfo.path ? `<strong>File:</strong> <a href="${mediaInfo.path}" target="_blank" rel="noopener noreferrer">View Media</a>` : ''}
+                        </div>
+                    `;
+                }
+
+                // Format and sanitize the main content
+                if (content) {
+                    const formattedContent = formatMessageContent(content);
+                    if (formattedContent.length > 10000) {
+                        html += `<div class="content-warning mb-2">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                            Large message (${formattedContent.length.toLocaleString()} characters)
+                        </div>`;
+                    }
+                    html += `<div class="message-content">${formattedContent}</div>`;
+                } else {
+                    html += `<div class="message-fallback">No content available</div>`;
+                }
+
+                resolve(html);
+            }, 0);
+        });
+
+        // Update the container with processed content
+        container.innerHTML = processedContent;
+
+        // Initialize any syntax highlighting if needed
+        if (window.Prism) {
+            container.querySelectorAll('pre code').forEach((block) => {
+                Prism.highlightElement(block);
+            });
+        }
+    } catch (error) {
+        console.error('Error updating message preview:', error);
+        container.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-circle text-red-500 mr-2"></i>
+                Error loading message content
+            </div>
+        `;
+    }
+}
+
+function updateModalFields(modalId, eventObj, isReadOnly = false) {
+    // Basic event info
+    setFieldValue(modalId, 'field-event', eventObj.event || 'create', isReadOnly);
+    setFieldValue(modalId, 'field-timestamp', toLocalDatetime(eventObj.timestamp), isReadOnly);
+    setFieldValue(modalId, 'field-edit_timestamp', toLocalDatetime(eventObj.edit_timestamp), isReadOnly);
+      // Source channel info
+    const sourceChannelId = eventObj.source_channel_id || eventObj.source_channel || '';
+    const destChannelId = eventObj.dest_channel_id || eventObj.dest_channel || '';
+    
+    setFieldValue(modalId, 'field-source_channel', formatChannelId(sourceChannelId), isReadOnly);
+    setFieldValue(modalId, 'field-source_channel_name', eventObj.source_channel_name || '', isReadOnly);
+    setFieldValue(modalId, 'field-message_id', eventObj.message_id || '', isReadOnly);
+    
+    // Destination channel info
+    setFieldValue(modalId, 'field-dest_channel', formatChannelId(destChannelId), isReadOnly);
+    setFieldValue(modalId, 'field-dest_channel_name', eventObj.dest_channel_name || '', isReadOnly);
+    setFieldValue(modalId, 'field-dest_message_id', eventObj.dest_message_id || '', isReadOnly);
+
+    // Status indicators
+    const status = document.querySelector(`#${modalId} #field-status`);
+    if (status) {
+        const isSuccess = eventObj.posting_success === true;
+        status.textContent = isSuccess ? 'SUCCESS' : 'FAILED';
+        status.className = `status-badge status-${isSuccess ? 'success' : 'error'}`;
+    }
+
+    // Error message if any
+    const error = document.querySelector(`#${modalId} #field-error`);
+    if (error) {
+        if (eventObj.exception_message) {
+            error.textContent = eventObj.exception_message;
+            error.classList.remove('hidden');
+        } else {
+            error.classList.add('hidden');
+        }
+    }
+
+    // Message previews
+    const sourcePreview = document.querySelector(`#${modalId} #source-message-preview`);
+    const translatedPreview = document.querySelector(`#${modalId} #translated-message-preview`);
+
+    // Update source message preview
+    if (sourcePreview) {
+        const mediaInfo = eventObj.media_type ? {
+            type: eventObj.media_type,
+            size: eventObj.file_size_bytes,
+            path: eventObj.file_path
+        } : null;
+        
+        updateMessagePreview(sourcePreview, eventObj.source_message, mediaInfo);
+    }
+
+    // Update translated message preview
+    if (translatedPreview) {
+        updateMessagePreview(translatedPreview, eventObj.translated_message);
+    }
+
+    // Additional metrics
+    const retryCount = document.querySelector(`#${modalId} #field-retry-count`);
+    if (retryCount) {
+        const count = eventObj.retry_count || 0;
+        retryCount.textContent = `${count} attempt${count !== 1 ? 's' : ''}`;
+        retryCount.className = `status-badge ${count > 0 ? 'status-warning' : 'status-info'}`;
+    }
+
+    // Process duration
+    const duration = document.querySelector(`#${modalId} #field-process-duration`);
+    if (duration) {
+        const ms = eventObj.translation_time ? Math.round(eventObj.translation_time * 1000) : 0;
+        duration.textContent = formatDuration(ms);
+    }
+
+    // Update size information with proper formatting
+    const originalSize = document.querySelector(`#${modalId} #field-original-size`);
+    const translatedSize = document.querySelector(`#${modalId} #field-translated-size`);
+    const sizeChanges = document.querySelector(`#${modalId} #size-changes`);
+    const previousSize = document.querySelector(`#${modalId} #field-previous-size`);
+    const newSize = document.querySelector(`#${modalId} #field-new-size`);
+
+    if (originalSize) {
+        originalSize.textContent = formatNumber(eventObj.original_size);
+    }
+    if (translatedSize) {
+        translatedSize.textContent = formatNumber(eventObj.translated_size);
+    }
+
+    // Handle size changes for edit events
+    if (eventObj.event === 'edit' && eventObj.previous_size && eventObj.new_size) {
+        if (sizeChanges) sizeChanges.classList.remove('hidden');
+        if (previousSize) previousSize.textContent = formatNumber(eventObj.previous_size);
+        if (newSize) newSize.textContent = formatNumber(eventObj.new_size);
+        updateSizeChangeIndicator(eventObj.previous_size, eventObj.new_size);
+    } else {
+        if (sizeChanges) sizeChanges.classList.add('hidden');
+    }
+}
+
+function showModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) {
+        console.error(`Modal ${modalId} not found`);
+        return;
+    }
+
+    modal.classList.remove('hidden');
+    // Use requestAnimationFrame to ensure the display change happens after hidden is removed
+    requestAnimationFrame(() => {
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+    });
+
+    // Setup click-outside-to-close
+    const handleOutsideClick = (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+            hideModal(modalId);
+        }
+    };
+    modal.addEventListener('click', handleOutsideClick);
+}
+
+function hideModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    modal.style.opacity = '0';
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }, 200);
+}
+
+function showEditModal(eventObj) {
+    if (!eventObj) {
+        console.error('No event object provided to showEditModal');
+        return;
+    }
+
+    currentEventObj = eventObj;
+    originalValues = {};  // Reset original values
+    showModal('edit-modal');
+    updateModalFields('edit-modal', eventObj, false);
+
+    // Set up the edit modal footer with Save and Cancel buttons
+    const modalFooter = document.querySelector('#edit-modal .modal-footer');
+    if (modalFooter) {
+        modalFooter.innerHTML = `
+            <button type="button" 
+                    onclick="hideModal('edit-modal')"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                Cancel
+            </button>
+            <button type="submit" 
+                    form="event-edit-form"
+                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                Save Changes
+            </button>
+        `;
+    }
+
+    // Re-initialize form event listeners
+    const form = document.getElementById('event-edit-form');
+    if (form) {
+        form.removeEventListener('submit', handleFormSubmit);
+        form.addEventListener('submit', handleFormSubmit);
+    }
+}
+
+function showDetailsModal(eventObj) {
+    if (!eventObj) {
+        console.error('No event object provided to showDetailsModal');
+        return;
+    }
+
+    showModal('details-modal');
+    updateModalFields('details-modal', eventObj, true);
+
+    // Set up the details modal footer with only a Close button
+    const modalFooter = document.querySelector('#details-modal .modal-footer');
+    if (modalFooter) {
+        modalFooter.innerHTML = `
+            <button type="button" 
+                    onclick="hideModal('details-modal')"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors">
+                Close
+            </button>
+        `;
+    }
+
+    // Ensure all form fields are read-only in details view
+    const form = document.querySelector('#details-modal form');
+    if (form) {
+        form.querySelectorAll('input, textarea, select').forEach(field => {
+            field.setAttribute('readonly', true);
+            field.classList.add('bg-gray-50', 'cursor-not-allowed');
+        });
+    }
+}
+
+// Format channel ID for display
+function formatChannelId(id) {
+    if (!id) return '';
+    
+    // Remove any non-numeric characters
+    const numericId = String(id).replace(/[^0-9-]/g, '');
+    
+    // Validate the channel ID format (should be a large negative number for channels)
+    if (!numericId.match(/^-?\d{10,20}$/)) {
+        console.warn(`Invalid channel ID format: ${id}`);
+        return id; // Return original if invalid
+    }
+    
+    return numericId;
+}
+
+// Validate channel ID format
+function isValidChannelId(id) {
+    if (!id) return false;
+    const numericId = String(id).replace(/[^0-9-]/g, '');
+    return numericId.match(/^-?\d{10,20}$/) !== null;
+}
+
+// Helper functions for size formatting and comparison
+function formatNumber(num) {
+    return num ? num.toLocaleString() : '0';
+}
+
+function updateSizeChangeIndicator(previousSize, newSize) {
+    if (!previousSize || !newSize) return;
+    
+    const sizeDiff = newSize - previousSize;
+    const percentChange = ((newSize - previousSize) / previousSize * 100).toFixed(1);
+    const indicator = document.getElementById('size-change-indicator');
+    
+    if (sizeDiff === 0) {
+        indicator.innerHTML = `
+            <span class="text-gray-600">
+                <i class="fas fa-equals"></i>
+                No change
+            </span>
+        `;
+    } else if (sizeDiff > 0) {
+        indicator.innerHTML = `
+            <span class="text-red-600">
+                <i class="fas fa-arrow-up"></i>
+                +${percentChange}%
+            </span>
+        `;
+    } else {
+        indicator.innerHTML = `
+            <span class="text-green-600">
+                <i class="fas fa-arrow-down"></i>
+                ${percentChange}%
+            </span>
+        `;
+    }
+}
+
+// Initialize event handlers when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up form submission handler
+    const editForm = document.getElementById('event-edit-form');
+    if (editForm) {
+        editForm.addEventListener('submit', handleFormSubmit);
+    }
+    
+    // Set up close buttons
+    document.querySelectorAll('.modal-close-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const modalId = btn.closest('.modal-overlay').id;
+            hideModal(modalId);
+        });
+    });
 });

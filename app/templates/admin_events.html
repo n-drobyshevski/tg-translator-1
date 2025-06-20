@@ -9,6 +9,7 @@
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
           crossorigin="anonymous"
           referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/column_chooser.css') }}">
     <style>
       html, body { font-family: "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
                     "Segoe UI", Arial, sans-serif; }
@@ -154,21 +155,144 @@
         color: #7c8799;
       }
       .filter-bar-row {
-        background: #f4f6fa;
-        border-radius: 6px;
-        padding: 6px 8px;
-        margin-bottom: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 0.75rem;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       }
-      @media (max-width: 900px) {
-        .enterprise-table th, .enterprise-table td {
-          font-size: 13px;
-          padding: 8px;
+
+      .filter-bar-row:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+
+      .filter-field,
+      .filter-operator {
+        min-width: 140px;
+        height: 40px;
+        padding: 0.5rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background-color: white;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 1.25rem;
+        appearance: none;
+        transition: all 0.2s ease-in-out;
+      }
+
+      .filter-value {
+        flex-grow: 1;
+        height: 40px;
+        padding: 0.5rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: #1e293b;
+        background-color: white;
+        transition: all 0.2s ease-in-out;
+      }
+
+      .filter-field:hover,
+      .filter-operator:hover,
+      .filter-value:hover {
+        border-color: #cbd5e1;
+      }
+
+      .filter-field:focus,
+      .filter-operator:focus,
+      .filter-value:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+      }
+
+      .filter-remove-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 0.5rem;
+        color: #ef4444;
+        background: transparent;
+        transition: all 0.2s ease-in-out;
+      }
+
+      .filter-remove-btn:hover {
+        background-color: #fef2f2;
+        color: #dc2626;
+      }
+
+      .filter-remove-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+      }
+
+      #filtersContainer {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        width: 100%;
+      }
+
+      #addFilterBtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        height: 40px;
+        padding: 0 1rem;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #1e293b;
+        background-color: #f1f5f9;
+        transition: all 0.2s ease-in-out;
+      }
+
+      #addFilterBtn:hover {
+        background-color: #e2e8f0;
+      }
+
+      #addFilterBtn:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      }
+
+      #addFilterBtn i {
+        font-size: 0.875rem;
+      }
+
+      @media (max-width: 768px) {
+        .filter-bar-row {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 0.5rem;
+          padding: 0.75rem;
         }
-        .column-chooser-modal { min-width: 95vw; }
-        .filter-btn-row { flex-direction: column !important; gap: 0.5rem !important; }
+
+        .filter-field,
+        .filter-operator {
+          width: 100%;
+          min-width: unset;
+        }
+
+        .filter-remove-btn {
+          align-self: flex-end;
+          margin-top: 0.25rem;
+        }
       }
       /* Styles for the details modal content */
       .message-fallback {
@@ -220,6 +344,289 @@
         margin-top: 4px;
         display: block;
       }
+
+      /* Enhanced Modal Styles */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+        will-change: opacity;
+        padding: 1.5rem;
+      }
+
+      .modal-overlay:not(.hidden) {
+        opacity: 1;
+      }
+
+      .modal-container {
+        max-width: min(95vw, 1200px);
+        width: 100%;
+        max-height: 90vh;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        transform: scale(0.95) translateY(-10px);
+        opacity: 0;
+        transition: all 0.2s ease-out;
+        display: flex;
+        flex-direction: column;
+        margin: auto;
+        position: relative;
+      }
+
+      .modal-overlay:not(.hidden) .modal-container {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+
+      .modal-header {
+        padding: 1.25rem 1.5rem;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+      }
+
+      .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.4;
+      }
+
+      .modal-close-btn {
+        width: 2rem;
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.375rem;
+        color: #64748b;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+      }
+
+      .modal-close-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+      }
+
+      .modal-body {
+        padding: 1.5rem;
+        background: #fff;
+        color: #333;
+        font-size: 14px;
+        line-height: 1.6;
+        overflow-y: auto;
+        max-height: calc(90vh - 4rem);
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .preview-area {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        min-height: 100px;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.875rem;
+        line-height: 1.5;
+      }
+
+      .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1.25;
+      }
+
+      .status-success {
+        background-color: #ecfdf5;
+        color: #059669;
+      }
+
+      .status-error {
+        background-color: #fef2f2;
+        color: #dc2626;
+      }
+
+      .status-warning {
+        background-color: #fffbeb;
+        color: #d97706;
+      }
+
+      .status-info {
+        background-color: #eff6ff;
+        color: #3b82f6;
+      }
+
+      .message-cards-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .status-cards-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+      }
+
+      .message-card, .status-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1.25rem;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #4b5563;
+        margin-bottom: 0.5rem;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        line-height: 1.25;
+        color: #1f2937;
+        background: #fff;
+        transition: border-color 0.15s ease-in-out;
+      }
+
+      .form-control[readonly] {
+        background-color: #f8fafc;
+        cursor: not-allowed;
+      }
+
+      .section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .section-title i {
+        font-size: 0.875rem;
+        color: #6366f1;
+      }
+
+      @media (max-width: 768px) {
+        .message-cards-container,
+        .status-cards-container {
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+
+        .modal-container {
+          margin: 0.5rem;
+          max-height: calc(100vh - 1rem);
+        }
+      }
+
+      /* Column customization styles */
+      .column-chooser-list {
+        max-height: 400px;
+        overflow-y: auto;
+        padding: 1rem;
+      }
+
+      .column-item {
+        cursor: move;
+      }
+
+      .column-item.dragging {
+        opacity: 0.5;
+      }
+
+      /* Toggle switch styles */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 50px;
+        height: 24px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: .4s;
+      }
+
+      input:checked + .slider {
+        background-color: #2196F3;
+      }
+
+      input:focus + .slider {
+        box-shadow: 0 0 1px #2196F3;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      .slider.round {
+        border-radius: 24px;
+      }
+
+      .slider.round:before {
+        border-radius: 50%;
+      }
     </style>
 {% endblock %}
 
@@ -237,62 +644,114 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container mx-auto p-3" id="admin-stats">
-      <!-- Filter & Column Buttons Row -->
-      <div class="filter-btn-row flex flex-row items-center gap-2 mb-3">
-        <button id="addFilterBtn"
-                class="bg-blue-500 text-white px-3 py-2 rounded shadow text-sm font-medium flex items-center gap-2">
-          <i class="fa fa-filter"></i> Add Filter
-        </button>
-        <button id="openColumnChooser"
-                class="bg-white border border-slate-300 hover:bg-slate-100 px-3 py-2 rounded shadow text-sm font-medium flex items-center gap-2">
-          <i class="fa fa-table-columns"></i> Columns
-        </button>
-      </div>
+{# First import the modal body #}
+{% from 'events_edit_modal.html' import body as modal_body with context %}
 
-      <!-- FILTER BAR (only filters added by user will appear here) -->
-      <div id="filtersContainer" class="mb-4"></div>
-
-      <!-- Table -->
-      <div class="overflow-x-auto bg-white rounded shadow border border-slate-200">
-        <table class="enterprise-table w-full" id="eventsTable">
-          <thead>
-            <tr id="eventsTableHeadRow"></tr>
-          </thead>
-          <tbody id="eventsTbody" class="list"></tbody>
-        </table>
-      </div>
-
-      <!-- Modals rendered by macro: -->
-      <div id="modals-here">
-        {% set details_modal_body %}
-        <div id="details-modal-content-wrapper" class="space-y-3">
-            <div id="message-status" class="mb-3 text-sm"></div>
-            <div>
-                <h4 class="text-md font-semibold mb-1 text-slate-700">Source Message</h4>
-                <div id="source-message-preview" class="p-2.5 bg-slate-50 border border-slate-200 rounded text-xs overflow-auto max-h-48 min-h-[50px]">
-                    <div class="message-fallback">Loading source message...</div>
+<!-- Column Chooser Modal -->
+<div id="column-chooser-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="column-chooser-title">
+    <div class="modal-container bg-white rounded-lg shadow-xl max-w-2xl">
+        <div class="modal-header bg-gray-50 border-b border-gray-200 px-6 py-4">
+            <h3 id="column-chooser-title" class="modal-title text-xl font-semibold text-gray-800">Customize Columns</h3>
+            <button type="button" class="modal-close-btn text-gray-500 hover:text-gray-700 transition-colors" aria-label="Close modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body p-6">
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm text-gray-600">Drag and drop columns to reorder them. Toggle visibility using the switches.</p>
+                    <button type="button" id="reset-columns" class="text-sm text-blue-600 hover:text-blue-800 transition-colors">
+                        Reset to Default
+                    </button>
+                </div>
+                <div class="relative">
+                    <input type="text" id="column-search" 
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg pl-10 text-sm"
+                           placeholder="Search columns..."
+                           aria-label="Search columns">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
             </div>
-            <div>
-                <h4 class="text-md font-semibold mb-1 text-slate-700">Translated Message (from Event)</h4>
-                <div id="translated-message-preview" class="p-2.5 bg-slate-50 border border-slate-200 rounded text-xs overflow-auto max-h-48 min-h-[50px]">
-                    <div class="message-fallback">Loading translated preview...</div>
-                </div>
+            <div class="columns-container max-h-[400px] overflow-y-auto">
+                <ul id="column-list" class="column-chooser-list space-y-2" role="list" aria-label="Draggable column list">
+                    <!-- Column items will be dynamically inserted here -->
+                </ul>
             </div>
         </div>
-        {% endset %}
-        {{ modal('details-modal', 'Event Details', details_modal_body, '<button onclick="closeModal(&#39;details-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
-        {{ modal('preview-modal', 'Full Message Preview', '', '<button onclick="closeModal(&#39;preview-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
-        {{ modal('column-chooser-modal', 'Customize Columns', '<div id="columnChooserList"></div>', '<button onclick="closeModal(&#39;column-chooser-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>') }}
-        {% include 'events_edit_modal.html' %}
-      </div>
+        <div class="modal-footer bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
+            <button type="button" id="cancel-columns" class="btn-secondary">
+                Cancel
+            </button>
+            <button type="button" id="apply-columns" class="btn-primary">
+                Apply Changes
+            </button>
+        </div>
     </div>
+</div>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-container bg-white rounded-lg shadow-xl">
+        <div class="flex items-center justify-between p-4 border-b">
+            <h3 class="text-xl font-semibold text-gray-900">Message Preview</h3>
+            <button type="button" class="text-gray-400 hover:text-gray-500" onclick="closeModal('preview-modal')">
+                <span class="sr-only">Close</span>
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-4 max-h-[70vh] overflow-y-auto">
+            <div id="preview-content"></div>
+        </div>
+    </div>
+</div>
+<!-- Table Controls -->
+<div class="mb-6">
+  <div class="flex flex-wrap items-center gap-3 mb-4">
+    <button id="openColumnChooser" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+      <i class="fas fa-columns"></i>
+      <span>Customize Columns</span>
+    </button>
+    <button id="addFilterBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+      <i class="fas fa-filter"></i>
+      <span>Add Filter</span>
+      <span class="filter-count hidden ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full"></span>
+    </button>
+  </div>
+  <div id="filtersContainer" class="w-full" role="region" aria-label="Active filters"></div>
+</div>
+<!-- Events Table -->
+<div class="overflow-x-auto">
+    <table id="eventsTable" class="enterprise-table w-full">
+        <thead>
+          <tr>
+            <th data-column="timestamp" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+            <th data-column="event" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
+            <th data-column="source_channel_name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source Channel</th>
+            <th data-column="dest_channel_name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
+            <th data-column="message_id" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Msg ID</th>
+            <th data-column="posting_success" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th data-column="preview" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
+            <th data-column="actions" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="eventsTbody"></tbody>
+    </table>
+</div>
+
+
+
+{# Edit and Details Modals #}
+{{ modal('edit-modal', 'Edit Event', modal_body) }}
+{{ modal('details-modal', 'Event Details', modal_body) }}
+
 {% endblock %}
 
 
 {% block scripts %}
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <script src="{{ url_for('static', filename='js/utils/sanitize.js') }}"></script>
   <script src="{{ url_for('static', filename='events_edit_modal.js') }}"></script>
 
   {# Data island for channel_cache JSON #}
@@ -655,7 +1114,7 @@ function renderTable() {
 
   displayedEvents = filterData(eventsData);
   if (sortState.column === "timestamp" && eventsData.length > 0) {
-      displayedEvents.sort((a, b) => compareValues(a.timestamp, b.timestamp, "timestamp") * sortState.dir);
+    displayedEvents.sort((a, b) => compareValues(a.timestamp, b.timestamp, "timestamp") * sortState.dir);
   }
   renderTableBody(displayedEvents);
 }
@@ -670,6 +1129,32 @@ function updateSortArrows() {
       arrow.innerHTML = "";
     }
   });
+}
+
+function renderActions(event) {
+    return `
+        <div class="flex items-center space-x-2">
+            <button onclick="showEditOrDetails(event, '${event.id}', true)" 
+                    class="px-2 py-1 text-sm text-blue-600 hover:text-blue-800">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button onclick="showEditOrDetails(event, '${event.id}', false)"
+                    class="px-2 py-1 text-sm text-gray-600 hover:text-gray-800">
+                <i class="fas fa-eye"></i>
+            </button>
+        </div>
+    `;
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return '-';
+  const date = new Date(timestamp);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${hours}:${minutes} ${day}-${month}-${year}`;
 }
 
 function renderTableBody(data) {
@@ -697,10 +1182,15 @@ function renderTableBody(data) {
       cell.className = "col-" + field;
 
       let cellValue = event[field];
-      if (field === "posting_success") {
+      // Format timestamps in HH:MM DD-MM-YYYY format
+      if (field === "timestamp" || field === "edit_timestamp") {
+        cellValue = formatTimestamp(cellValue);
+      } else if (field === "posting_success") {
         cellValue = cellValue ? '<span class="success-badge">OK</span>' : '<span class="error-badge">FAIL</span>';
       } else if (field === "preview" && typeof cellValue === "string") {
         cellValue = `<button class="preview-lineclamp" onclick="event.stopPropagation(); showPreviewModal(\`${cellValue.replace(/`/g, '\\`')}\`)">${cellValue}</button>`;
+      } else if (field === "actions") {
+        cellValue = renderActions(event);
       }
       cell.innerHTML = cellValue ?? "";
       
@@ -740,26 +1230,68 @@ function updateTableColumnVisibility() {
 //==========================================================================================
 function addFilter() {
   const filterId = 'filter-' + Date.now();
-  // Use string concatenation for HTML generation
-  const filterHtml = 
-    '<div id="' + filterId + '" class="filter-bar-row p-2 border rounded mb-2 bg-slate-50">' +
-      '<select class="filter-field form-select form-select-sm">' +
-        FILTER_FIELDS.map(f => '<option value="' + f + '">' + prettifyFieldName(f).short + '</option>').join('') +
-      '</select>' +
-      '<select class="filter-operator form-select form-select-sm">' +
-        FILTER_OPERATORS.map(op => '<option value="' + op + '">' + op + '</option>').join('') +
-      '</select>' +
-      '<input type="text" class="filter-value form-input form-input-sm flex-grow" placeholder="Value (comma-sep for IS/IS NOT)">' +
-      '<button onclick="removeFilter(&#39;' + filterId + '&#39;)" class="text-red-500 hover:text-red-700 p-1 text-sm">' +
-        '<i class="fa fa-trash"></i>' +
-      '</button>' +
-    '</div>';
+  const filterHtml = `
+    <div id="${filterId}" class="filter-bar-row" style="opacity: 0; transform: translateX(-10px);" role="group" aria-label="Filter criteria">
+      <select class="filter-field" aria-label="Filter field">
+        ${FILTER_FIELDS.map(f => {
+          const fieldName = prettifyFieldName(f);
+          return `<option value="${f}" title="${fieldName.tooltip}">${fieldName.short}</option>`;
+        }).join('')}
+      </select>
+      <select class="filter-operator" aria-label="Filter operator">
+        ${FILTER_OPERATORS.map(op => `<option value="${op}">${op}</option>`).join('')}
+      </select>
+      <input type="text" class="filter-value" 
+        placeholder="Value (comma-separated for IS/IS NOT)" 
+        aria-label="Filter value"
+        autocomplete="off">
+      <button type="button"
+        class="filter-remove-btn" 
+        onclick="removeFilter('${filterId}')"
+        aria-label="Remove filter">
+        <i class="fas fa-times" aria-hidden="true"></i>
+      </button>
+    </div>`;
   document.getElementById("filtersContainer").insertAdjacentHTML("beforeend", filterHtml);
   
+  // Animate the new filter row
+  setTimeout(() => {
+    const filterElement = document.getElementById(filterId);
+    filterElement.style.opacity = "1";
+    filterElement.style.transform = "translateX(0)";
+  }, 10);
+  
   const newFilterElement = document.getElementById(filterId);
-  const inputs = newFilterElement.querySelectorAll("select, input");
+  const inputs = newFilterElement.querySelectorAll("select");
+  const valueInput = newFilterElement.querySelector(".filter-value");
+  
+  // Handle immediate changes from dropdowns
   inputs.forEach(input => input.addEventListener("change", applyFiltersAndRender));
-  newFilterElement.querySelector(".filter-value").addEventListener("keyup", applyFiltersAndRender);
+  
+  // Debounce text input
+  const debouncedFilterUpdate = debounce(applyFiltersAndRender, 300);
+  valueInput.addEventListener("input", debouncedFilterUpdate);
+  
+  // Add keyboard interaction
+  valueInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      valueInput.blur();
+      applyFiltersAndRender();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      valueInput.value = "";
+      applyFiltersAndRender();
+    }
+  });
+
+  // Update ARIA labels when field changes
+  const fieldSelect = newFilterElement.querySelector(".filter-field");
+  fieldSelect.addEventListener("change", () => {
+    const fieldName = prettifyFieldName(fieldSelect.value);
+    valueInput.setAttribute("aria-label", `Filter value for ${fieldName.short}`);
+    valueInput.setAttribute("placeholder", `Enter ${fieldName.short.toLowerCase()} value...`);
+  });
 
 
   activeFilters.push({ 
@@ -772,20 +1304,47 @@ function addFilter() {
 }
 
 function removeFilter(filterId) {
-  document.getElementById(filterId).remove();
-  activeFilters = activeFilters.filter(f => f.id !== filterId);
-  applyFiltersAndRender();
+  const filterElement = document.getElementById(filterId);
+  if (filterElement) {
+    filterElement.style.opacity = "0";
+    filterElement.style.transform = "translateX(10px)";
+    setTimeout(() => {
+      filterElement.remove();
+      activeFilters = activeFilters.filter(f => f.id !== filterId);
+      applyFiltersAndRender();
+      updateFilterCount();
+    }, 200);
+  }
 }
+
+function updateFilterCount() {
+  const countElement = document.querySelector("#addFilterBtn .filter-count");
+  if (countElement) {
+    const count = activeFilters.length;
+    countElement.textContent = count;
+    countElement.classList.toggle("hidden", count === 0);
+  }
+}
+
+// Debounce helper
+const debounce = (fn, ms) => {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+};
 
 function applyFiltersAndRender() {
   activeFilters = Array.from(document.querySelectorAll("#filtersContainer > div")).map(filterElement => ({
     id: filterElement.id,
     field: filterElement.querySelector(".filter-field").value,
     operator: filterElement.querySelector(".filter-operator").value,
-    value: filterElement.querySelector(".filter-value").value
+    value: filterElement.querySelector(".filter-value").value.trim()
   }));
   
   displayedEvents = filterData(eventsData);
+  updateFilterCount();
   if (sortState.column) {
     displayedEvents.sort((a, b) => {
         let valA = a[sortState.column];
@@ -829,9 +1388,9 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Error fetching events: " + data.error);
         return;
       }
-      eventsData = data.events_last_100 || []; // Correctly access the array
-      console.log("Fetched events data:", eventsData);
-
+      // Add IDs to events data
+      eventsData = processEventsData(data.events_last_100 || []);
+      
       if (eventsData.length > 0) {
         allFields = Object.keys(eventsData[0] || {});
       } else {
@@ -855,13 +1414,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Initialize visible fields, ensuring they are a subset of allFields
       let visibleFields = getVisibleFields();
-      visibleFields = visibleFields.filter(field => allFields.includes(field));
-      // If no visible fields are set or valid, default to a subset of allFields or a predefined minimal set
+      visibleFields = visibleFields.filter(field => allFields.includes(field));      // If no visible fields are set or valid, default to a subset of allFields or a predefined minimal set
       if (visibleFields.length === 0 && allFields.length > 0) {
-          // Default to first 5 fields or a specific set
-          const defaultVisible = ["timestamp", "event", "source_channel_name", "dest_channel_name", "preview"];
+          // Default visible fields including actions column
+          const defaultVisible = ["timestamp", "event", "source_channel_name", "dest_channel_name", "preview", "actions"];
           visibleFields = allFields.filter(f => defaultVisible.includes(f));
           if (visibleFields.length === 0) visibleFields = allFields.slice(0, Math.min(5, allFields.length));
+          if (!visibleFields.includes("actions")) visibleFields.push("actions");
       }
       setVisibleFields(visibleFields);
 
@@ -916,5 +1475,151 @@ function closeModal(id) {
     overlay.classList.add("hidden");
   }
 }
+
+function showEditOrDetails(e, eventId, isEdit = true) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const event = eventsData.find(e => e.id === eventId);
+    if (!event) {
+        console.warn(`Event with ID ${eventId} not found`);
+        return;
+    }
+
+    if (isEdit) {
+        if (typeof showEditModal === 'function') {
+            showEditModal(event);
+        } else {
+            console.error('showEditModal function not found');
+        }
+    } else {
+        if (typeof showDetailsModal === 'function') {
+            showDetailsModal(event);
+        } else {
+            console.error('showDetailsModal function not found');
+        }
+    }
+}
+
+function generateEventId(event) {
+    // Create a unique ID from the event's key properties
+    return `${event.source_channel}-${event.message_id}-${event.timestamp}`.replace(/[^a-zA-Z0-9-]/g, '-');
+}
+
+function processEventsData(events) {
+    return events.map(event => ({
+        ...event,
+        id: generateEventId(event)
+    }));
+}
+
+/* Event modal script */
+function showEventModal(eventId) {
+  const event = eventsData.find(e => e.id === eventId);
+  if (!event) return;
+
+  const modalBody = `
+    <div class="space-y-4">
+      <div>
+        <strong class="text-gray-700">Event ID:</strong>
+        <span class="text-gray-900">${event.id}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Source Channel:</strong>
+        <span class="text-gray-900">${event.source_channel_name} (${event.source_channel})</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Destination Channel:</strong>
+        <span class="text-gray-900">${event.dest_channel_name} (${event.dest_channel})</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Message ID:</strong>
+        <span class="text-gray-900">${event.message_id}</span>
+      </div>
+      <div>        <strong class="text-gray-700">Event Time:</strong>
+        <span class="text-gray-900">${formatTimestamp(event.timestamp)}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Edit Time:</strong>
+        <span class="text-gray-900">${formatTimestamp(event.edit_timestamp)}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Status:</strong>
+        <span class="text-gray-900">${event.posting_success ? 'Successful' : 'Failed'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Error Code:</strong>
+        <span class="text-gray-900">${event.api_error_code || '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Error Message:</strong>
+        <span class="text-gray-900">${event.exception_message || '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Media Type:</strong>
+        <span class="text-gray-900">${event.media_type || '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">File Size:</strong>
+        <span class="text-gray-900">${event.file_size_bytes ? (event.file_size_bytes / 1024).toFixed(2) + ' KB' : '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Original Size:</strong>
+        <span class="text-gray-900">${event.original_size ? (event.original_size / 1024).toFixed(2) + ' KB' : '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Translated Size:</strong>
+        <span class="text-gray-900">${event.translated_size ? (event.translated_size / 1024).toFixed(2) + ' KB' : '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Translation Time:</strong>
+        <span class="text-gray-900">${event.translation_time ? event.translation_time + ' ms' : '-'}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Retry Count:</strong>
+        <span class="text-gray-900">${event.retry_count || 0}</span>
+      </div>
+      <div>
+        <strong class="text-gray-700">Preview:</strong>
+        <div class="message-preview max-h-40 overflow-auto">
+          ${event.preview ? `<div class="whitespace-pre-wrap">${event.preview}</div>` : '<em>No preview available</em>'}
+        </div>
+      </div>
+      <div>
+        <strong class="text-gray-700">Source Content:</strong>
+        <div class="message-source-content max-h-40 overflow-auto">
+          ${event.source_content ? `<div class="whitespace-pre-wrap">${event.source_content}</div>` : '<em>No source content available</em>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  updateModal('event-modal', 'Event Details', modalBody, `
+    <button onclick="closeModal('event-modal')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>
+  `);
+  openModal('event-modal');
+}
+
+// Initialize event handlers for edit/details buttons
+document.addEventListener('DOMContentLoaded', function() {
+    const detailButtons = document.querySelectorAll('[data-action="details"]');
+    const editButtons = document.querySelectorAll('[data-action="edit"]');
+    
+    detailButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.stopPropagation();
+            const eventId = this.getAttribute('data-event-id');
+            showDetailsModal(eventId);
+        });
+    });
+    
+    editButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            event.stopPropagation();
+            const eventId = this.getAttribute('data-event-id');
+            showEventModal(eventId);
+        });
+    });
+});
   </script>
 {% endblock %}
