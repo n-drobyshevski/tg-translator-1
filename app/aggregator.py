@@ -11,10 +11,9 @@ import datetime
 import os
 from collections import Counter, defaultdict
 from datetime import timedelta, date, timezone
-from pathlib import Path
 from typing import Any, Dict, List
 import logging
-from translator.config import STATS_PATH
+from translator.config import EVENTS_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +23,33 @@ logger = logging.getLogger(__name__)
 
 
 def load_messages() -> List[Dict[str, Any]]:
-    if not os.path.exists(STATS_PATH):        return []
-    with open(STATS_PATH, 'r', encoding='utf-8') as f:
+    """
+    Load all messages from the events file specified by EVENTS_PATH.
+
+    Returns:
+        List of message/event dictionaries.
+    Raises:
+        FileNotFoundError: If the events file does not exist.
+    """
+    if not os.path.exists(EVENTS_PATH):
+        raise FileNotFoundError(f"Events file not found: {EVENTS_PATH}")
+    with open(EVENTS_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     msgs = data.get("messages", [])
     return msgs
 
 
 def build_summary(messages: List[Dict[str, Any]], days: int = 10) -> Dict[str, List]:
+    """
+    Build a daily summary of message counts for the last `days` days.
+
+    Args:
+        messages: List of message/event dictionaries.
+        days: Number of days to include in the summary.
+
+    Returns:
+        Dict with 'labels' (dates) and 'counts' (message counts per day).
+    """
     today = date.today()
     labels = [(today - timedelta(days=d)).isoformat() for d in reversed(range(days))]
     day_counter: Counter[str] = Counter()
@@ -42,9 +60,9 @@ def build_summary(messages: List[Dict[str, Any]], days: int = 10) -> Dict[str, L
         try:
             dt = datetime.datetime.fromisoformat(ts)
             day = dt.date().isoformat()
-            # logger.info("build_summary: incrementing count for day %s", day)
             day_counter[day] += 1
         except ValueError as e:
+            logger.warning("build_summary: skip evt, parse error %s", e)
             continue
     counts = [day_counter.get(label, 0) for label in labels]
     # logger.info("build_summary: labels=%s counts=%s", labels, counts)
@@ -54,20 +72,39 @@ def build_summary(messages: List[Dict[str, Any]], days: int = 10) -> Dict[str, L
 def build_10d_channels(
     messages: List[Dict[str, Any]], days: int = 10
 ) -> Dict[str, Any]:
+    """
+    Build a 10-day per-channel message count matrix.
+
+    Args:
+        messages: List of message/event dictionaries.
+        days: Number of days to include.
+
+    Returns:
+        Dict with 'labels' (dates) and 'series' (per-channel counts).
+    """
     today = date.today()
     labels = [(today - timedelta(days=d)).isoformat() for d in reversed(range(days))]
     per_chan: Dict[str, Counter[str]] = {}
     for evt in messages:
         # include every message that has a timestamp
-        if not evt.get("timestamp"):
+        ts = evt.get("timestamp")
+        if not ts:
+            logger.warning(
+                "build_10d_channels: skip evt %s, no timestamp",
+                evt.get("message_id", "unknown"),
+            )
             continue
         chan = evt.get("source_channel_name") or evt.get("source_channel", "")
-        ts = evt.get("timestamp")
         try:
             dt = datetime.datetime.fromisoformat(ts)
             day = dt.date().isoformat()
             per_chan.setdefault(chan, Counter())[day] += 1
-        except ValueError:
+        except ValueError as e:
+            logger.warning(
+                "build_10d_channels: skip evt %s, parse error %s",
+                evt.get("message_id", "unknown"),
+                e,
+            )
             continue
     series = [
         {"label": chan, "data": [per_chan[chan].get(d, 0) for d in labels]}
@@ -77,6 +114,15 @@ def build_10d_channels(
 
 
 def build_hourly_matrix(messages: list[dict]) -> dict:
+    """
+    Build a matrix of message counts by hour of day and day of week.
+
+    Args:
+        messages: List of message/event dictionaries.
+
+    Returns:
+        Dict with 'data' (matrix), 'xLabels' (hours), 'yLabels' (days), and 'max' (max count).
+    """
     counts = Counter()
     maxv = 0
     events_by_cell = defaultdict(list)
@@ -91,7 +137,12 @@ def build_hourly_matrix(messages: list[dict]) -> dict:
             continue
         try:
             dt = datetime.datetime.fromisoformat(ts)
-        except Exception as e:
+        except ValueError as e:
+            logger.warning(
+                "build_hourly_matrix: skip m %s, parse error %s",
+                m.get("message_id", "unknown"),
+                e,
+            )
             continue
         hour = dt.strftime("%H")
         dow = dt.strftime("%a")
@@ -114,6 +165,15 @@ def build_hourly_matrix(messages: list[dict]) -> dict:
 
 
 def build_10d_by_channel(messages: list[dict]) -> dict:
+    """
+    Build a 10-day message count summary by channel.
+
+    Args:
+        messages: List of message/event dictionaries.
+
+    Returns:
+        Dict with 'labels' (channel names) and 'counts' (message counts).
+    """
     logger.info("build_10d_by_channel: messages=%d", len(messages))
     # use timezone-aware UTC now
     cutoff = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=10)
@@ -126,7 +186,7 @@ def build_10d_by_channel(messages: list[dict]) -> dict:
             continue
         try:
             dt = datetime.datetime.fromisoformat(ts)
-        except Exception as e:
+        except ValueError as e:
             logger.info("build_10d_by_channel: skip m, parse error %s", e)
             continue
         if dt > cutoff:
@@ -139,14 +199,21 @@ def build_10d_by_channel(messages: list[dict]) -> dict:
 
 def build_throughput_latency(messages):
     """
-    Returns data for a scatter plot: original_size vs translation_time.
+    Build data for a scatter plot: original_size vs translation_time.
+
+    Args:
+        messages: List of message/event dictionaries.
+
+    Returns:
+        Dict with 'points' for scatter plot (each point is a dict).
     """
     scatter = [
         {
             "x": m.get("original_size", 0),
             "y": m.get("translation_time", 0),
             "label": m.get("source_channel_name", "") or m.get("source_channel", ""),
-            "id": m.get("message_id"),  # <-- Add message_id for tooltip
+            "id": m.get("message_id"),
+            "dest_message_id": m.get("dest_message_id"),
         }
         for m in messages
         if m.get("original_size") is not None and m.get("translation_time") is not None

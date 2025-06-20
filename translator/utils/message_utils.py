@@ -1,29 +1,22 @@
 from typing import Any, Dict, List, Optional, Tuple
-from translator.services.channel_logger import store_message
 
 def get_media_info(msg, max_size: int) -> Tuple[Optional[str], Optional[int], str]:
-    """Extract file_id, file_size_bytes, and media_type from message."""
+    """Extract file_id, file_size_bytes, media_type from message."""
     file_id = None
     file_size_bytes = None
     media_type = "text"
     if msg.document and msg.document.file_size <= max_size:
-        file_id, file_size_bytes, media_type = (
-            msg.document.file_id,
-            msg.document.file_size,
-            "doc",
-        )
+        file_id = msg.document.file_id
+        file_size_bytes = msg.document.file_size
+        media_type = "doc"
     elif msg.photo and getattr(msg.photo, "file_size", 0) <= max_size:
-        file_id, file_size_bytes, media_type = (
-            msg.photo.file_id,
-            getattr(msg.photo, "file_size", None),
-            "photo",
-        )
+        file_id = msg.photo.file_id
+        file_size_bytes = getattr(msg.photo, "file_size", None)
+        media_type = "photo"
     elif msg.video and msg.video.file_size <= max_size:
-        file_id, file_size_bytes, media_type = (
-            msg.video.file_id,
-            msg.video.file_size,
-            "video",
-        )
+        file_id = msg.video.file_id
+        file_size_bytes = msg.video.file_size
+        media_type = "video"
     return file_id, file_size_bytes, media_type
 
 def build_payload(msg, html_text: str, meta: Dict[str, Any]) -> Dict[str, Any]:
@@ -42,18 +35,6 @@ def build_payload(msg, html_text: str, meta: Dict[str, Any]) -> Dict[str, Any]:
         "Meta": meta,
     }
 
-def log_and_store_message(msg, html_text: str) -> Any:
-    """Store source message in channel_logger cache."""
-    msg_id = getattr(msg, "id", None) or getattr(msg, "message_id", None)
-    msg_data = {
-        "message_id": msg_id,
-        "date": getattr(msg, "date", None),
-        "chat_title": getattr(msg.chat, "title", ""),
-        "chat_username": getattr(msg.chat, "username", ""),
-        "html": html_text,
-    }
-    store_message(msg.chat.id, msg_data)
-    return msg_id
 
 def extract_channel_info(
     msg, mapping: Dict[int, str], target: str

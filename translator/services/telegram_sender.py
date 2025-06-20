@@ -1,16 +1,11 @@
 import logging
-import os
 from typing import List, Optional, Tuple, Any
 
 import requests
 from dotenv import load_dotenv
-from translator.models import ChannelConfig
-from translator.config import CHANNEL_CONFIGS
+from translator.config import CHANNEL_CONFIGS, BOT_TOKEN
+from translator.services.event_logger import EventRecorder
 
-try:
-    from .channel_logger import store_message
-except ImportError:
-    from translator.services.channel_logger import store_message
 
 load_dotenv()
 
@@ -26,6 +21,17 @@ def sanitize_html(text: str) -> str:
         .replace("<br/>", "\n")
         .replace("<br />", "\n")
     )
+
+
+def get_channel_config(target: str):
+    cfg = CHANNEL_CONFIGS.get(target)
+    if not cfg:
+        logging.error("Unknown channel type: %s", target)
+        return None, "Unknown channel type"
+    if not getattr(cfg, "channel_id", None):
+        logging.error("No channel_id for %s", target)
+        return None, "No channel_id for target"
+    return cfg, None
 
 
 class TelegramSender:
@@ -121,6 +127,15 @@ class TelegramSender:
     def _post_telegram(
         self, url: str, *, data: dict = None, json: dict = None
     ) -> Tuple[bool, Optional[requests.Response], Optional[str]]:
+        """
+        Send a POST request to the Telegram Bot API.
+
+        Returns:
+            (success, response, error_message)
+            - success: True if status_code is 200, else False
+            - response: requests.Response object if available, else None
+            - error_message: error description or exception string if failed, else None
+        """
         try:
             r = _SESSION.post(url, data=data, json=json, timeout=10)
             if r.status_code != 200:
@@ -137,121 +152,107 @@ class TelegramSender:
     async def send_message(
         self,
         text: str,
-        target: str,
-        meta: Any = None,
-    ) -> Tuple[bool, Optional[int], Optional[int], Optional[str]]:
-        cfg = self.configs.get(target)
-        if not cfg:
-            logging.error("Unknown channel type: %s", target)
-            return False, None, None, "Unknown channel type"
-        if not cfg.channel_id:
-            logging.error("No channel_id for %s", target)
-            return False, None, None, "No channel_id for target"
+        recorder: EventRecorder,
+    ):
+        target, dest_channel_id = recorder.get("dest_channel_name", "dest_channel_id")
 
-        url = f"https://api.telegram.org/bot{cfg.bot_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         chunks = self.split_message(text)
-        sent_msg_id = None
-        sent_chat_id = None
-        posting_success = False
-
-        media_type, file_size_bytes, source_channel, message_id = (
-            self._extract_meta_fields(meta, target)
-        )
+        sent_msg_id, posting_success = None, False
 
         for chunk in chunks:
             sanitized_chunk = sanitize_html(chunk)
-            logging.info("Sending chunk to %s (chat_id %s)…", target, cfg.channel_id)
+            logging.info("Send message: Sending chunk to %s (chat_id %s)…", target, dest_channel_id)
             success, r, err = self._post_telegram(
                 url,
                 json={
-                    "chat_id": cfg.channel_id,
+                    "chat_id": dest_channel_id,
                     "text": sanitized_chunk,
                     "parse_mode": "HTML",
                 },
             )
+            exception_message = None
             if not success or r is None:
-                logging.error("Failed to send to %s: %s", cfg.channel_id, err)
-                return False, None, r.status_code if r else None, err
+                logging.error("Send message: Failed to send to %s: %s", dest_channel_id, err)
+                if r is not None:
+                    try:
+                        exception_message = r.json().get("description", r.text)
+                    except Exception:
+                        exception_message = r.text
+                else:
+                    exception_message = str(err)
+                recorder.set(
+                    dest_message_id=sent_msg_id,
+                    posting_success=posting_success,
+                    api_error_code=err,
+                    exception_message=exception_message,
+                )
+                logging.error(
+                    "Send message: Error sending message to %s: %s",
+                    dest_channel_id,
+                    exception_message,
+                )
+                return 
             result = r.json().get("result", {})
             sent_msg_id = result.get("message_id")
-            sent_chat_id = result.get("chat", {}).get("id")
             posting_success = True
-
-        logging.info("Successfully sent %d chunk(s) to %s", len(chunks), target)
-        if meta is not None:
-            source_msg = meta.get("source_msg")
-            self._store_message(
-                sent_chat_id, sent_msg_id, source_msg, target, text, meta
+            recorder.set(
+                dest_message_id=sent_msg_id,
+                posting_success=posting_success,
+                api_error_code=None,
+                exception_message=None,
             )
-
-        return posting_success, sent_chat_id, None, None
-
-    async def send_photo_message(
-        self,
-        photo: str,
-        caption: str,
-        target: str,
-        meta: Any = None,
-    ) -> Tuple[bool, Optional[int], Optional[int], Optional[str]]:
-        cfg = self.configs.get(target)
-        if not cfg:
-            logging.error("Unknown channel type: %s", target)
-            return False, None, None, "Unknown channel type"
-        if not cfg.channel_id:
-            logging.error("No channel_id for %s", target)
-            return False, None, None, "No channel_id for target"
-
-        url = f"https://api.telegram.org/bot{cfg.bot_token}/sendPhoto"
-        sanitized_caption = sanitize_html(caption)
-
-        media_type, file_size_bytes, source_channel, message_id = (
-            self._extract_meta_fields(meta, target)
+        logging.info(
+            "Send message: Successfully sent %d chunk(s) to %s", len(chunks), target
         )
 
-        sent_msg_id = None
-        sent_chat_id = None
-        posting_success = False
+        return
+
+    async def send_photo_message(
+        self, photo: str, caption: str, recorder: EventRecorder
+    ):
+        target, dest_channel_id = recorder.get("dest_channel_name", "dest_channel_id")
+        cfg, err = get_channel_config(target)
+        if not cfg:
+            return False, None, None, err
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        sanitized_caption = sanitize_html(caption)
+
+        sent_msg_id, posting_success = None, False
 
         logging.info("Sending photo to %s (chat_id %s)…", target, cfg.channel_id)
         success, r, err = self._post_telegram(
             url,
             data={
-                "chat_id": cfg.channel_id,
+                "chat_id": dest_channel_id,
                 "photo": photo,
                 "caption": sanitized_caption,
                 "parse_mode": "HTML",
             },
         )
         if not success or r is None:
-            logging.error("Failed to send photo to %s: %s", cfg.channel_id, err)
-            return False, None, r.status_code if r else None, err
+            logging.error("Failed to send photo to %s: %s", dest_channel_id, err)
+            recorder.set(
+                dest_message_id=sent_msg_id,
+                posting_success=posting_success,
+            )
+            return 
+
         result = r.json().get("result", {})
         sent_msg_id = result.get("message_id")
-        sent_chat_id = result.get("chat", {}).get("id")
         posting_success = True
 
+        recorder.set(dest_message_id=sent_msg_id)
+        recorder.set(posting_success=posting_success)
         logging.info("Successfully sent photo to %s", target)
+        return
 
-        if meta is not None:
-            source_msg = meta.get("source_msg")
-            self._store_message(
-                sent_chat_id, sent_msg_id, source_msg, target, caption, meta
-            )
-
-        return posting_success, sent_chat_id, None, None
-
-    def edit_message(
-        self,
-        channel_id,
-        message_id,
-        text,
-    ):
+    async def edit_message(self, channel_id, message_id, text, recorder: EventRecorder):
         """
         Edit a message in a Telegram channel by channel_id and message_id.
         Returns (posting_success, api_error_code, exception_message).
         """
-        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
         sanitized_text = sanitize_html(text)
         payload = {
             "chat_id": channel_id,
@@ -262,26 +263,27 @@ class TelegramSender:
         posting_success = False
         api_error_code = None
         exception_message = None
-        try:
-            resp = _SESSION.post(url, data=payload, timeout=10)
-            if resp.status_code == 200 and resp.json().get("ok"):
-                posting_success = True
-                return posting_success, None, None
-            else:
-                logging.error(
-                    "Failed to edit message %s in %s: %s",
-                    message_id,
-                    channel_id,
-                    resp.text,
-                )
-                posting_success = False
-                api_error_code = resp.status_code
-                exception_message = resp.text
-                return posting_success, api_error_code, exception_message
-        except Exception as e:
+        sent_msg_id = None
+
+        success, resp, err = self._post_telegram(url, data=payload)
+        if not success or resp is None:
             logging.error(
-                "Exception editing message %s in %s: %s", message_id, channel_id, e
+                "Failed to edit message %s in %s: %s",
+                message_id,
+                channel_id,
+                err,
             )
-            posting_success = False
-            exception_message = str(e)
-            return posting_success, None, exception_message
+            api_error_code = resp.status_code if resp else None
+            exception_message = err
+        else:
+            result = resp.json().get("result", {})
+            sent_msg_id = result.get("message_id")
+            posting_success = True
+
+        recorder.set(
+            dest_message_id=sent_msg_id,
+            posting_success=posting_success,
+            api_error_code=api_error_code,
+            exception_message=exception_message,
+        )
+        return

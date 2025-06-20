@@ -116,7 +116,8 @@ def admin_config():
             current_admin_password = os.getenv("ADMIN_PASSWORD", "")
 
     return render_template(
-"admin_config.html",
+        "admin_config.html",
+        active_page="config",
         current_bot_token=current_bot_token,
         current_api_key=current_api_key,
         current_prompt=current_prompt,
@@ -130,7 +131,7 @@ def admin_config():
         current_pythonanywhere_username=current_pythonanywhere_username,
         current_admin_password=current_admin_password,
         message=message,
-        restart_toast=restart_toast,
+        restart_toast=restart_toast
     )
 
 @admin_config_bp.route("/admin/", methods=["GET"])

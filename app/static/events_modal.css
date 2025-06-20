@@ -1,0 +1,148 @@
+.modal-grid {
+    display: grid;
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.message-cards-container,
+.status-cards-container {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.message-card,
+.status-card {
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 1.25rem;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #2d3748;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title i {
+    opacity: 0.7;
+}
+
+.preview-area {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    min-height: 100px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 0.875rem;
+}
+
+.preview-area .media-info {
+    background: #edf2f7;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.media-info a {
+    color: #4a5568;
+    text-decoration: underline;
+}
+
+.media-info a:hover {
+    color: #2d3748;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.status-badge.status-success {
+    background-color: #c6f6d5;
+    color: #22543d;
+}
+
+.status-badge.status-error {
+    background-color: #fed7d7;
+    color: #742a2a;
+}
+
+.status-badge.status-info {
+    background-color: #bee3f8;
+    color: #2a4365;
+}
+
+.status-badge.status-warning {
+    background-color: #feebc8;
+    color: #7b341e;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    background: #f8fafc;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.form-control:read-only {
+    background-color: #f8fafc;
+    cursor: not-allowed;
+}
+
+/* Scrollbar styling */
+.preview-area::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.preview-area::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.preview-area::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 4px;
+}
+
+.preview-area::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+}

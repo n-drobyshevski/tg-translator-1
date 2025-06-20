@@ -1,98 +1,33 @@
 {% macro modal(id, title, body, footer=None) %}
-<style>
-  /* Modal Overlay */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: none;
-    z-index: 999;
-  }
+<div id="{{ id }}" class="modal-overlay hidden" role="dialog" aria-labelledby="{{ id }}-title" aria-describedby="{{ id }}-content" aria-modal="true" onclick="handleModalOverlayClick(event, '{{ id }}')">
+    <div class="modal-container" onclick="event.stopPropagation();">
+        <div class="modal-header">
+            <h3 class="modal-title" id="{{ id }}-title">{{ title }}</h3>
+            <button type="button" class="modal-close-btn" onclick="hideModal('{{ id }}')" aria-label="Close modal">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                    <path d="M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="modal-body" id="{{ id }}-content">
+            {% if body is string %}
+                {{ body | safe }}
+            {% else %}
+                {{ body }}
+            {% endif %}
+        </div>
 
-  /* Modal Container */
-  .modal-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    z-index: 1000;
-    display: none;
-  }
-
-  /* Modal Header */
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .modal-title {
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: #111827;
-  }
-
-  .modal-close {
-    background: none;
-    border: none;
-    font-size: 1.25rem;
-    cursor: pointer;
-    color: #6b7280;
-  }
-
-  /* Modal Body */
-  .modal-body {
-    padding: 16px;
-    max-height: 70vh;
-    overflow-y: auto;
-  }
-
-  /* Modal Footer */
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    padding: 16px;
-    border-top: 1px solid #e5e7eb;
-  }
-</style>
-
-<div class="modal-overlay" id="{{ id }}-overlay" onclick="closeModal('{{ id }}')"></div>
-<div class="modal-container" id="{{ id }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-title">
-  <div class="modal-header">
-    <h2 class="modal-title" id="{{ id }}-title">{{ title }}</h2>
-    <button class="modal-close" aria-label="Close modal" onclick="closeModal('{{ id }}')">&times;</button>
-  </div>
-  <div class="modal-body">
-    {{ body | safe }}
-  </div>
-  {% if footer %}
-  <div class="modal-footer">
-    {{ footer | safe }}
-  </div>
-  {% endif %}
+        {% if footer %}
+        <div class="modal-footer">
+            {% if footer is string %}
+                {{ footer | safe }}
+            {% else %}
+                {{ footer }}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
 </div>
-
-<script>
-  function openModal(id) {
-    document.getElementById(id).style.display = 'block';
-    document.getElementById(id + '-overlay').style.display = 'block';
-  }
-
-  function closeModal(id) {
-    document.getElementById(id).style.display = 'none';
-    document.getElementById(id + '-overlay').style.display = 'none';
-  }
-</script>
 {% endmacro %}

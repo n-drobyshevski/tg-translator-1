@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from flask_login import login_required
 import logging
 import json
-from translator.config import STATS_PATH
+from translator.config import EVENTS_PATH
 
 admin_bp = Blueprint("admin_bp", __name__)
 logger = logging.getLogger(__name__)  # add logger
@@ -27,12 +27,20 @@ def compute_stats(messages):
         "compute_stats: total_posts=%d, success_count=%d, fail_count=%d, error_count=%d, success_rate=%.1f",
         total_posts, success_count, fail_count, error_count, success_rate
     )
+
+    # Calculate average message size
+    msg_sizes = [m.get("original_size", 0) for m in messages if m.get("original_size") is not None]
+    avg_msg_size = round(sum(msg_sizes) / len(msg_sizes)) if msg_sizes else 0
+    logger.debug("compute_stats: avg_msg_size=%d chars", avg_msg_size)
+
     # Avg latency
     latencies = [m.get("translation_time", 0) for m in messages if m.get("translation_time") is not None]
     avg_latency = round(sum(latencies) / len(latencies), 2) if latencies else 0
     logger.debug("compute_stats: avg_latency=%.2f", avg_latency)
+
     # Latest timestamp
     latest = max((m.get("timestamp") for m in messages if m.get("timestamp")), default="-")
+
     # Busiest channel pair
     from collections import Counter
     pairs = [
@@ -49,6 +57,7 @@ def compute_stats(messages):
         busiest_percent = round(100 * count / total_posts)
     else:
         busiest, busiest_percent = "-", 0
+
     logger.debug(
         "compute_stats: busiest_pair=%s, busiest_pair_percent=%d",
         busiest, busiest_percent
@@ -60,6 +69,7 @@ def compute_stats(messages):
         "error_count":   error_count,
         "success_rate":   success_rate,
         "avg_latency":    avg_latency,
+        "avg_msg_size":   avg_msg_size,
         "latest_timestamp": latest,
         "busiest_pair":   busiest,
         "busiest_pair_percent": busiest_percent,
@@ -79,7 +89,7 @@ def admin_dashboard():
         "SHALTNOTKILL_CHANNEL": os.getenv("SHALTNOTKILL_CHANNEL", ""),
     }
     try:
-        with open(STATS_PATH, "r", encoding="utf-8") as f:
+        with open(EVENTS_PATH, "r", encoding="utf-8") as f:
             stats_json = json.load(f)
         messages = stats_json.get("messages", [])
         stats = compute_stats(messages)
@@ -97,4 +107,4 @@ def admin_dashboard():
             "busiest_pair_percent": 0,
         }
         
-    return render_template("admin_dashboard.html", info=info, stats=stats)
+    return render_template("admin_dashboard.html", info=info, stats=stats, active_page="dashboard")

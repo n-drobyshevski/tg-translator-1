@@ -1,18 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>{% block title %}{% endblock %}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  {% block head %}{% endblock %}
-</head>
-<body class="bg-gray-100 text-gray-900">
-  <div class="container mx-auto p-4">
-    {% block header %}{% endblock %}
-    <hr class="mb-4" />
-    {% block content %}{% endblock %}
-  </div>
-  {% block scripts %}{% endblock %}
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>{% block title %}{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}" />
+    <script>
+      document.addEventListener("alpine:init", () => {
+        Alpine.store("tooltips", {
+          canShow: false,
+        });
+      });
+    </script>
+    <script
+      defer
+      src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+    ></script>
+    {% block head %}{% endblock %}
+  </head>
+  <body
+    class="bg-gray-100 text-gray-900 overflow-hidden h-screen"
+    x-data="{ 
+          sidebarCollapsed: {{ 'false' if active_page == 'config' else 'true' }},
+          toggleSidebar() {
+            // Always hide tooltips first
+            Alpine.store('tooltips').canShow = false;
+            
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            
+            // Only show tooltips after collapse animation completes
+            if (this.sidebarCollapsed) {
+              setTimeout(() => {
+                Alpine.store('tooltips').canShow = true;
+              }, 600); // Slightly longer delay to ensure transition is complete
+            }
+          }
+        }"
+    x-init="
+          $watch('sidebarCollapsed', value => {
+            if (!value) {
+              Alpine.store('tooltips').canShow = false;
+            }
+          });
+          // Initialize tooltips as hidden
+          Alpine.store('tooltips').canShow = false;
+        "
+  >
+    {% from 'components/sidebar.html' import sidebar %} {{
+    sidebar(active_item=active_page) }}
+    <div
+      x-bind:class="{ 'md:pl-64': !sidebarCollapsed, 'md:pl-16': sidebarCollapsed }"
+      class="transition-all duration-500 ease-in-out min-h-screen flex flex-col"
+    >
+      <div class="h-screen flex flex-col bg-white">
+        <div class="p-6 flex flex-col h-[calc(100vh-1rem)]">          <div class="flex items-center gap-4 mb-4 flex-none">            <div class="flex items-center md:hidden">
+              <button
+                @click="toggleSidebar()"
+                class="group p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg focus:outline-none"
+                aria-label="Toggle sidebar"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  class="h-5 w-5 transition-transform duration-200" 
+                  :class="{ 'rotate-90': !sidebarCollapsed }"
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <div class="w-px h-5 bg-gray-200 mx-4"></div>
+            </div>
+            {% block header %}{% endblock %}
+          </div>
+          <hr class="my-4 border-gray-100" />
+          <div class="flex-1 min-h-0 overflow-y-auto">
+            {% block content %}{% endblock %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% block scripts %}{% endblock %}
+  </body>
 </html>

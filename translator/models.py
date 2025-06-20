@@ -22,27 +22,31 @@ class MetadataRequest:
 @dataclass
 class MessageEvent:
     """Statistics log entry for a message event."""
-    timestamp: str 
+    timestamp: str
     event_type: str
-    source_channel: str
-    dest_channel: str
-    source_channel_name: Optional[str]
-    dest_channel_name: Optional[str]
-    message_id: Optional[str]
-    media_type: Optional[str]
-    file_size_bytes: Optional[int]
-    original_size: Optional[int]
-    translated_size: Optional[int]
-    translation_time: Optional[float]
-    retry_count: Optional[int]
-    posting_success: Optional[bool]
-    api_error_code: Optional[int]
-    exception_message: Optional[str]
+    source_channel_id: str
+    dest_channel_id: str
+    source_channel_name: str = ""
+    dest_channel_name: str = ""
+    message_id: str = ""
+    media_type: str = ""
+    file_size_bytes: int = 0
+    original_size: int = 0
+    translated_size: int = 0
+    translation_time: float = 0.0
+    retry_count: int = 0
+    posting_success: bool = False
+    api_error_code: int = 0
+    exception_message: str = ""
     # Optional fields for edits, etc.
-    edit_timestamp: Optional[str] = None
-    previous_size: Optional[int]    = None
-    new_size: Optional[int]         = None
+    edit_timestamp: str = ""
+    previous_size: int = 0
+    new_size: int = 0
+    source_message: str = ""
+    translated_message: str = ""
+    dest_message_id: str = ""
+    file_path: str = ""  
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dict, skipping None values."""
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        """Serialize to dict, keeping all fields (even if empty or zero)."""
+        return asdict(self)

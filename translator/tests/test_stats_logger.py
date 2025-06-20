@@ -1,13 +1,13 @@
 from unittest.mock import patch
 import pytest
-from translator.services import stats_logger
+from translator.services import event_logger
 
 
 # Covers handling missing edit_timestamp, event inference, None fields, etc.
 @patch("translator.services.stats_logger._save_stats")
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_event_type_inference_create(mock_load, mock_save):
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type=None,
         source_channel="A",
         dest_channel="B",
@@ -28,7 +28,7 @@ def test_record_event_event_type_inference_create(mock_load, mock_save):
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_handles_missing_optional(mock_load, mock_save):
     # Omit lots of fields to hit all None cases
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type="create",
         source_channel="s",
         dest_channel="d",
@@ -47,7 +47,7 @@ def test_record_event_handles_missing_optional(mock_load, mock_save):
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_event_value_override(mock_load, mock_save):
     # Pass explicit event='message_edit'
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type="edit",
         source_channel="S",
         dest_channel="D",
@@ -66,7 +66,7 @@ def test_record_event_event_value_override(mock_load, mock_save):
 
 def test_build_event_kwargs_fills_missing():
     # No kwargs except event_type, all required are filled with None
-    d = stats_logger.build_event_kwargs(event_type="create")
+    d = event_logger.build_event_kwargs(event_type="create")
     # All required positional keys should be present
     for k in [
         "source_channel",
@@ -80,7 +80,7 @@ def test_build_event_kwargs_fills_missing():
 
 
 def test_build_event_kwargs_passes_extra():
-    d = stats_logger.build_event_kwargs(event_type="edit", foo=123, bar="baz")
+    d = event_logger.build_event_kwargs(event_type="edit", foo=123, bar="baz")
     assert d["foo"] == 123 and d["bar"] == "baz"
 
 
@@ -88,7 +88,7 @@ def test_build_event_kwargs_passes_extra():
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_negative_values(mock_load, mock_save):
     # Should not error on negative or zero numbers
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type="create",
         source_channel="A",
         dest_channel="B",
@@ -109,7 +109,7 @@ def test_record_event_negative_values(mock_load, mock_save):
 @patch("translator.services.stats_logger._save_stats")
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_edits_all_fields(mock_load, mock_save):
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type="edit",
         source_channel="a",
         dest_channel="b",
@@ -137,7 +137,7 @@ def test_record_event_edits_all_fields(mock_load, mock_save):
 
 
 def test_build_event_kwargs_omits_none():
-    out = stats_logger.build_event_kwargs(
+    out = event_logger.build_event_kwargs(
         event_type="edit", foo=123, bar="baz", translated_size=None
     )
     # "translated_size" is required, so should be present as None, extra fields as-is
@@ -146,7 +146,7 @@ def test_build_event_kwargs_omits_none():
 
 
 def test_build_event_kwargs_required_keys():
-    out = stats_logger.build_event_kwargs(event_type="create")
+    out = event_logger.build_event_kwargs(event_type="create")
     # All required keys, even if None
     for key in [
         "event_type",
@@ -180,7 +180,7 @@ def test_record_event_basics(mock_load, mock_save):
     assert msgs[-1]["event_type"] == "create"
     assert msgs[-1]["posting_success"] is True
 from unittest.mock import patch
-from translator.services.stats_logger import record_event
+from translator.services.event_logger import record_event
 
 
 @patch("translator.services.stats_logger._save_stats")
@@ -228,7 +228,7 @@ def test_record_event_optional_fields(mock_load, mock_save):
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_all_fields(mock_load, mock_save):
     # Exercise all fields for max coverage
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type="edit",
         source_channel="s",
         dest_channel="d",
@@ -262,7 +262,7 @@ def test_record_event_all_fields(mock_load, mock_save):
 @patch("translator.services.stats_logger._load_stats", return_value={"messages": []})
 def test_record_event_event_type_infers_edit_or_create(mock_load, mock_save):
     # edit_timestamp triggers event=edit
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type=None,
         source_channel="s",
         dest_channel="d",
@@ -277,7 +277,7 @@ def test_record_event_event_type_infers_edit_or_create(mock_load, mock_save):
     msg = mock_save.call_args[0][0]["messages"][-1]
     assert msg["event_type"] == "edit"
     # No edit_timestamp triggers event=create
-    stats_logger.record_event(
+    event_logger.record_event(
         event_type=None,
         source_channel="s",
         dest_channel="d",
@@ -293,7 +293,7 @@ def test_record_event_event_type_infers_edit_or_create(mock_load, mock_save):
 
 
 def test_build_event_kwargs_default_fields():
-    out = stats_logger.build_event_kwargs(
+    out = event_logger.build_event_kwargs(
         event_type="create",
         source_channel="x",
         dest_channel="y",
@@ -307,7 +307,7 @@ def test_build_event_kwargs_default_fields():
     assert out["event_type"] == "create"
     assert out["original_size"] == 1
     # Should fill None for missing required keys
-    out2 = stats_logger.build_event_kwargs(event_type="create")
+    out2 = event_logger.build_event_kwargs(event_type="create")
     for key in [
         "source_channel",
         "dest_channel",
@@ -322,6 +322,6 @@ def test_build_event_kwargs_default_fields():
 
 
 def test_build_event_kwargs_extra_fields():
-    out = stats_logger.build_event_kwargs(event_type="edit", foo=123, bar="test")
+    out = event_logger.build_event_kwargs(event_type="edit", foo=123, bar="test")
     assert out["foo"] == 123
     assert out["bar"] == "test"

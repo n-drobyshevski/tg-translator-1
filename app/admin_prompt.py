@@ -10,6 +10,7 @@ from flask import (
 )
 from flask_login import login_required
 import os
+import requests
 from translator.config import PROMPT_TEMPLATE_PATH
 from translator.bot import translate_html  # use the actual translate function
 from anthropic import Anthropic
@@ -22,7 +23,10 @@ admin_prompt_bp = Blueprint("admin_prompt_bp", __name__)
 def modify_prompt():
     current_prompt = PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8")
     return render_template(
-        "admin_prompt_edit.html", current_prompt=current_prompt, message=""
+        "admin_prompt_edit.html",
+        current_prompt=current_prompt,
+        message="",
+        active_page="config",  # Since it's part of config section
     )
 
 
@@ -109,6 +113,7 @@ def test_translation():
                 "Link": "https://example.com",
             }
             import asyncio
+
             translation_result = asyncio.run(
                 translate_html(anthropic_client, payload)
             )
