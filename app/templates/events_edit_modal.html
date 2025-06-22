@@ -132,12 +132,129 @@
                         <label class="block text-sm font-medium text-gray-700">Retry Count</label>
                         <div id="field-retry-count" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"></div>
                     </div>
-                </div>
-
-                <!-- Error Message -->
-                <div class="space-y-2 hidden" id="error-container">
-                    <label class="block text-sm font-medium text-gray-700">Error Details</label>
-                    <div id="field-error" class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 hidden"></div>
+                </div>                <!-- Error Information -->
+                <div class="space-y-4 hidden" id="error-container">
+                    <!-- Error Header with Enhanced Visual Design -->
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-exclamation-triangle text-red-600 text-lg"></i>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="text-lg font-semibold text-red-800 mb-1">Error Detected</h4>
+                                <p class="text-sm text-red-600">This event encountered an error during processing. Review the details below for debugging information.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- API Error Code -->
+                    <div class="space-y-3 hidden" id="api-error-section">
+                        <div class="bg-white border border-red-200 rounded-lg overflow-hidden">
+                            <div class="bg-red-50 px-4 py-3 border-b border-red-200">
+                                <h5 class="flex items-center gap-2 text-sm font-semibold text-red-800">
+                                    <i class="fas fa-code text-red-600"></i>
+                                    <span>API Error Code</span>
+                                </h5>
+                            </div>
+                            <div class="p-4">
+                                <div id="field-api-error-code" class="inline-flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-mono bg-red-100 text-red-800 border border-red-300 w-full">
+                                    <i class="fas fa-exclamation-circle text-red-600 flex-shrink-0"></i>
+                                    <span class="font-semibold flex-1"></span>
+                                    <button type="button" 
+                                            class="text-red-600 hover:text-red-800 ml-2"
+                                            onclick="copyToClipboard(this.previousElementSibling.textContent)"
+                                            title="Copy error code">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-600">This code can help identify the specific API error that occurred.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Exception Message -->
+                    <div class="space-y-3 hidden" id="exception-error-section">
+                        <div class="bg-white border border-red-200 rounded-lg overflow-hidden">
+                            <div class="bg-red-50 px-4 py-3 border-b border-red-200">
+                                <h5 class="flex items-center gap-2 text-sm font-semibold text-red-800">
+                                    <i class="fas fa-bug text-red-600"></i>
+                                    <span>Exception Details</span>
+                                </h5>
+                            </div>
+                            <div class="p-4">
+                                <div id="field-exception-message" class="p-4 bg-red-50 border border-red-300 rounded-lg">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-exclamation-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm text-red-700 break-words font-mono leading-relaxed whitespace-pre-wrap"></p>
+                                        </div>
+                                        <button type="button" 
+                                                class="text-red-600 hover:text-red-800 ml-2 flex-shrink-0"
+                                                onclick="copyToClipboard(this.parentElement.querySelector('p').textContent)"
+                                                title="Copy exception message">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-600">Full technical details of the exception that occurred during processing.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- General Error Message -->
+                    <div class="space-y-3 hidden" id="general-error-section">
+                        <div class="bg-white border border-red-200 rounded-lg overflow-hidden">
+                            <div class="bg-red-50 px-4 py-3 border-b border-red-200">
+                                <h5 class="flex items-center gap-2 text-sm font-semibold text-red-800">
+                                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                                    <span>Error Information</span>
+                                </h5>
+                            </div>
+                            <div class="p-4">
+                                <div id="field-general-error" class="p-4 bg-red-50 border border-red-300 rounded-lg">
+                                    <div class="flex items-start gap-3">
+                                        <i class="fas fa-info-circle text-red-500 mt-1 flex-shrink-0"></i>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm text-red-700 break-words leading-relaxed"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="mt-2 text-xs text-gray-600">General error information for this event.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Enhanced Error Actions -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h6 class="text-sm font-medium text-gray-800">Debugging Actions</h6>
+                                <p class="text-xs text-gray-600 mt-1">Use these tools to investigate the error further.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2" id="error-actions">
+                                <button type="button" 
+                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-200 rounded-lg hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                                        onclick="copyErrorToClipboard()">
+                                    <i class="fas fa-copy"></i>
+                                    <span>Copy All Errors</span>
+                                </button>
+                                <button type="button" 
+                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100 border border-blue-200 rounded-lg hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                                        onclick="viewErrorInLogs()">
+                                    <i class="fas fa-file-alt"></i>
+                                    <span>View in Logs</span>
+                                </button>
+                                <button type="button" 
+                                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-100 border border-green-200 rounded-lg hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
+                                        onclick="showErrorHelp()">
+                                    <i class="fas fa-question-circle"></i>
+                                    <span>Help</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Message Sizes -->

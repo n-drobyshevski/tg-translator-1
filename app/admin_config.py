@@ -18,8 +18,8 @@ def admin_config():
     current_cv_en_channel_id = os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", "")
     current_snk_channel = os.getenv("SHALTNOTKILL_CHANNEL", "")
     current_snk_en_channel_id = os.getenv("SHALTNOTKILL_EN_CHANNEL_ID", "")
-    current_target_channel_id = os.getenv("TARGET_CHANNEL_ID", "")
-    current_source_test_id = os.getenv("SOURCE_TEST_ID", "")
+    current_target_channel_id = os.getenv("TERST_EN_CHANNEL_ID", "")
+    current_source_test_id = os.getenv("TEST_CHANNEL", "")
     current_pythonanywhere_api_token = os.getenv("PYTHONANYWHERE_API_TOKEN", "")
     current_pythonanywhere_username = os.getenv("PYTHONANYWHERE_USERNAME", "")
     current_admin_password = os.getenv("ADMIN_PASSWORD", "")
@@ -91,9 +91,9 @@ def admin_config():
             if new_snk_en_channel_id:
                 os.environ["SHALTNOTKILL_EN_CHANNEL_ID"] = new_snk_en_channel_id
             if new_target_channel_id:
-                os.environ["TARGET_CHANNEL_ID"] = new_target_channel_id
+                os.environ["TEST_EN_CHANNEL_ID"] = new_target_channel_id
             if new_source_test_id:
-                os.environ["SOURCE_TEST_ID"] = new_source_test_id
+                os.environ["TEST_CHANNEL"] = new_source_test_id
             if new_pythonanywhere_api_token:
                 os.environ["PYTHONANYWHERE_API_TOKEN"] = new_pythonanywhere_api_token
             if new_pythonanywhere_username:
@@ -109,8 +109,8 @@ def admin_config():
             current_cv_en_channel_id = os.getenv("CHRISTIANVISION_EN_CHANNEL_ID", "")
             current_snk_channel = os.getenv("SHALTNOTKILL_CHANNEL", "")
             current_snk_en_channel_id = os.getenv("SHALTNOTKILL_EN_CHANNEL_ID", "")
-            current_target_channel_id = os.getenv("TARGET_CHANNEL_ID", "")
-            current_source_test_id = os.getenv("SOURCE_TEST_ID", "")
+            current_target_channel_id = os.getenv("TEST_EN_CHANNEL_ID", "")
+            current_source_test_id = os.getenv("TEST_CHANNEL", "")
             current_pythonanywhere_api_token = os.getenv("PYTHONANYWHERE_API_TOKEN", "")
             current_pythonanywhere_username = os.getenv("PYTHONANYWHERE_USERNAME", "")
             current_admin_password = os.getenv("ADMIN_PASSWORD", "")

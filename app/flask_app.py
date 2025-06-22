@@ -7,7 +7,6 @@ from admin_dashboard import admin_bp
 from admin_prompt import admin_prompt_bp
 from admin_config import admin_config_bp  
 from admin_manager import admin_manager_bp
-from admin_cache import admin_cache_bp
 from admin_logs import admin_logs_bp
 from aggregator import (
     build_summary,
@@ -22,7 +21,6 @@ from translator.config import PROMPT_TEMPLATE_PATH
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-
 
 
 app = Flask(__name__)
@@ -78,7 +76,7 @@ def logout():
     logout_user()
     flash("Logged out 👋", "info")
     return redirect(url_for("login"))
- 
+
 
 bp = Blueprint("metrics", __name__, url_prefix="/api")
 
@@ -94,14 +92,14 @@ def metrics_summary():
         # Filter out test channels if needed
         if not include_test:
             test_ids = set()
-            for envvar in ("SOURCE_TEST_ID", "TARGET_CHANNEL_ID"):
+            for envvar in ("TEST_CHANNEL", "TEST_EN_CHANNEL_ID"):
                 val = os.getenv(envvar)
                 if val:
                     test_ids.add(str(val))
             def not_test(m):
                 return (
-                    str(m.get("source_channel")) not in test_ids and
-                    str(m.get("dest_channel")) not in test_ids and
+                    str(m.get("source_channel_id")) not in test_ids and
+                    str(m.get("dest_channel_id")) not in test_ids and
                     str(m.get("source_channel_name", "")).lower() != "test" and
                     str(m.get("dest_channel_name", "")).lower() != "test"
                 )
@@ -122,7 +120,6 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(admin_prompt_bp)
 app.register_blueprint(admin_config_bp)  # add this
 app.register_blueprint(admin_manager_bp)  # renamed blueprint
-app.register_blueprint(admin_cache_bp)  # register cache blueprint
 app.register_blueprint(admin_stats_bp)  # register stats blueprint
 app.register_blueprint(admin_logs_bp)
 app.register_blueprint(bp)

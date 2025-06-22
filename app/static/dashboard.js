@@ -280,10 +280,11 @@ function getColor(i) {
 /* Fetch summary JSON and feed the charts */
 async function loadMetrics() {
     try {
+        showLoadingState(true);
         const includeTest = getIncludeTestChannels();
         const res = await fetch(`/api/metrics/summary?include_test_channels=${includeTest ? "1" : "0"}`);
         if (!res.ok) {
-            throw new Error(res.statusText);
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
         
         const json = await res.json();
@@ -303,8 +304,13 @@ async function loadMetrics() {
         if (json.posts_matrix) {
             drawHeatmap(json.posts_matrix);
         }
+        
+        updateToggleState(includeTest);
+        showLoadingState(false);
     } catch (error) {
-        // Error handling can be added here if needed
+        console.error('Failed to load metrics:', error);
+        showErrorState(error.message);
+        showLoadingState(false);
     }
 }
 
@@ -364,19 +370,39 @@ function ready(fn) {
 ready(() => {
     if (typeof Chart === "undefined") return;
 
+    // Initialize toggle state from localStorage
+    initializeToggleState();
+    
     // Initialize all dashboard components
     loadMetrics();
     initializeTimeRangeSlider();
     initializeScrollHandling();
 
-    // Listen for test channel checkbox changes
+    // Listen for test channel checkbox changes with debouncing
     const cb = document.getElementById("include_test_channels");
     if (cb) {
-        cb.addEventListener("change", () => {
-            loadMetrics();
-            const slider = document.getElementById("timeRangeDays");
-            if (slider) {
-                loadPostsPerChannelChart(parseInt(slider.value, 10));
+        let debounceTimer;
+        cb.addEventListener("change", (event) => {
+            // Save preference to localStorage
+            localStorage.setItem('include_test_channels', event.target.checked);
+            
+            // Debounce the API calls to prevent rapid requests
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                loadMetrics();
+                const slider = document.getElementById("timeRangeDays");
+                if (slider) {
+                    loadPostsPerChannelChart(parseInt(slider.value, 10));
+                }
+            }, 300);
+        });
+        
+        // Add keyboard support
+        cb.addEventListener("keydown", (event) => {
+            if (event.key === " " || event.key === "Enter") {
+                event.preventDefault();
+                cb.checked = !cb.checked;
+                cb.dispatchEvent(new Event('change'));
             }
         });
     }
@@ -461,19 +487,113 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function loadPostsPerChannelChart(days) {
     try {
+        showLoadingState(true);
         const includeTest = getIncludeTestChannels();
         const res = await fetch(`/api/metrics/summary?days=${days}&include_test_channels=${includeTest ? "1" : "0"}`);
-        if (!res.ok) throw new Error(res.statusText);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
         const json = await res.json();
-        if (json.posts_10d_channels) drawPosts10dChannels(json.posts_10d_channels);
+        if (json.posts_10d_channels) {
+            drawPosts10dChannels(json.posts_10d_channels);
+        }
+        showLoadingState(false);
     } catch (error) {
-        // Error handling can be added here if needed
+        console.error('Failed to load posts per channel chart:', error);
+        showErrorState(error.message);
+        showLoadingState(false);
     }
 }
 
 function getIncludeTestChannels() {
     const cb = document.getElementById("include_test_channels");
     return cb ? cb.checked : true;
+}
+
+// Initialize toggle state from localStorage
+function initializeToggleState() {
+    const cb = document.getElementById("include_test_channels");
+    if (cb) {
+        const savedState = localStorage.getItem('include_test_channels');
+        if (savedState !== null) {
+            cb.checked = savedState === 'true';
+        }
+        updateToggleState(cb.checked);
+    }
+}
+
+// Update toggle visual state and accessibility
+function updateToggleState(isChecked) {
+    const cb = document.getElementById("include_test_channels");
+    const label = cb?.closest('label');
+    
+    if (cb && label) {
+        cb.checked = isChecked;
+        cb.setAttribute('aria-checked', isChecked.toString());
+        
+        // Update visual feedback
+        if (isChecked) {
+            label.classList.add('bg-blue-50', 'border-blue-200');
+            label.classList.remove('bg-gray-50');
+        } else {
+            label.classList.add('bg-gray-50');
+            label.classList.remove('bg-blue-50', 'border-blue-200');
+        }
+    }
+}
+
+// Show/hide loading state
+function showLoadingState(isLoading) {
+    const loader = document.getElementById("stats-loading");
+    const cb = document.getElementById("include_test_channels");
+    
+    if (loader) {
+        loader.classList.toggle('hidden', !isLoading);
+    }
+    
+    if (cb) {
+        cb.disabled = isLoading;
+        cb.setAttribute('aria-busy', isLoading.toString());
+    }
+}
+
+// Show error state with user-friendly message
+function showErrorState(message) {
+    // Remove any existing error messages
+    const existingError = document.getElementById('stats-error');
+    if (existingError) {
+        existingError.remove();
+    }
+    
+    // Create and show new error message
+    const errorDiv = document.createElement('div');
+    errorDiv.id = 'stats-error';
+    errorDiv.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 max-w-sm';
+    errorDiv.innerHTML = `
+        <div class="flex items-start">
+            <svg class="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <div>
+                <strong class="block">Failed to update statistics</strong>
+                <span class="text-sm">${message}</span>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-red-400 hover:text-red-600">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Auto-remove error after 5 seconds
+    setTimeout(() => {
+        if (errorDiv && errorDiv.parentElement) {
+            errorDiv.remove();
+        }
+    }, 5000);
 }
 
 function drawThroughputLatency({ points }) {

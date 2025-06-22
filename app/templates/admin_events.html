@@ -126,10 +126,10 @@
         transition: background 0.13s;
         gap: 12px;
       }
-      .column-chooser-li:hover { background: #eef1f7; }
-      .preview-lineclamp {
+      .column-chooser-li:hover { background: #eef1f7; }      .preview-lineclamp {
         display: -webkit-box;
         -webkit-line-clamp: 2;
+        line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
         white-space: normal;
@@ -663,19 +663,66 @@
                     <button type="button" id="reset-columns" class="text-sm text-blue-600 hover:text-blue-800 transition-colors">
                         Reset to Default
                     </button>
-                </div>
-                <div class="relative">
-                    <input type="text" id="column-search" 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-lg pl-10 text-sm"
-                           placeholder="Search columns..."
-                           aria-label="Search columns">
+                </div>                <div class="relative">
+                    <input type="text" id="column-search"                           class="w-full px-4 py-2 border border-gray-300 rounded-lg pl-10 pr-10 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                           placeholder="Search by field name, display name, or description..."
+                           aria-label="Search columns by technical field name (e.g. 'source_channel'), display name (e.g. 'Source'), or description"
+                           autocomplete="off">
                     <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <button type="button" id="clear-search" 
+                            class="hidden absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            aria-label="Clear search">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>                <div class="text-xs text-gray-500 mt-2">
+                    <span class="font-medium">Search tips:</span> Try "source", "msg", "time", "error", "type", "status" or technical names like "source_channel", "posting_success"
                 </div>
-            </div>
-            <div class="columns-container max-h-[400px] overflow-y-auto">
-                <ul id="column-list" class="column-chooser-list space-y-2" role="list" aria-label="Draggable column list">
-                    <!-- Column items will be dynamically inserted here -->
-                </ul>
+            </div>            <div class="columns-container max-h-[400px] overflow-y-auto">
+                <!-- Selected Columns Section -->
+                <div class="column-section mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                            Selected Columns
+                            <span id="selected-count" class="ml-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">0</span>
+                        </h4>
+                        <button type="button" id="clear-all-columns" 
+                                class="text-xs text-red-600 hover:text-red-800 transition-colors"
+                                title="Unselect all columns">
+                            Clear All
+                        </button>
+                    </div>
+                    <ul id="selected-column-list" class="column-chooser-list space-y-2" 
+                        role="list" aria-label="Selected columns - drag to reorder">
+                        <!-- Selected column items will be dynamically inserted here -->
+                    </ul>
+                </div>
+
+                <!-- Available Columns Section -->
+                <div class="column-section">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-700">
+                            <i class="fas fa-list text-gray-400 mr-2"></i>
+                            Available Columns
+                            <span id="available-count" class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">0</span>
+                        </h4>
+                        <button type="button" id="select-all-columns" 
+                                class="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                                title="Select all columns">
+                            Select All
+                        </button>
+                    </div>
+                    <ul id="available-column-list" class="column-chooser-list space-y-2" 
+                        role="list" aria-label="Available columns - click to select">
+                        <!-- Available column items will be dynamically inserted here -->
+                    </ul>
+                </div>
+
+                <div id="no-results-message" class="hidden text-center py-8 text-gray-500">
+                    <i class="fas fa-search text-2xl text-gray-300 mb-2"></i>
+                    <p class="text-sm">No columns match your search.</p>
+                    <p class="text-xs text-gray-400">Try different keywords or clear the search.</p>
+                </div>
             </div>
         </div>
         <div class="modal-footer bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
@@ -725,16 +772,7 @@
 <div class="overflow-x-auto">
     <table id="eventsTable" class="enterprise-table w-full">
         <thead>
-          <tr>
-            <th data-column="timestamp" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-            <th data-column="event" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-            <th data-column="source_channel_name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source Channel</th>
-            <th data-column="dest_channel_name" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
-            <th data-column="message_id" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Msg ID</th>
-            <th data-column="posting_success" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            <th data-column="preview" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Preview</th>
-            <th data-column="actions" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-          </tr>
+          <!-- Dynamic headers will be generated by renderTable() function -->
         </thead>
         <tbody id="eventsTbody"></tbody>
     </table>
@@ -750,45 +788,15 @@
 
 
 {% block scripts %}
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="{{ url_for('static', filename='js/utils/sanitize.js') }}"></script>
   <script src="{{ url_for('static', filename='events_edit_modal.js') }}"></script>
-
-  {# Data island for channel_cache JSON #}
-  <script id="channelCacheJsonData" type="application/json">
-    {{- channel_cache | tojson | safe -}}
-  </script>
 
   <script>
     console.log('Admin Events page script started.');
 
-    // This will be the globally accessible parsed cache data for this page
-    let channelCacheData = {};
-
-    try {
-        const channelCacheJsonElement = document.getElementById('channelCacheJsonData');
-        // Ensure element exists and textContent is not null before accessing
-        const channelCacheJsonString = channelCacheJsonElement ? channelCacheJsonElement.textContent : null;
-
-        if (channelCacheJsonString && channelCacheJsonString.trim() !== "") {
-            channelCacheData = JSON.parse(channelCacheJsonString);
-            // console.log("Successfully parsed channel_cache from data island:", channelCacheData); // For debugging
-        } else {
-            console.warn("channel_cache JSON string from data island is empty, not found, or whitespace.");
-        }
-    } catch (error) {
-        console.error("Error parsing channel_cache JSON from data island:", error);
-        const rawContent = document.getElementById('channelCacheJsonData') ? document.getElementById('channelCacheJsonData').textContent : "Element not found";
-        // console.error("Raw content from data island was:", rawContent); // Be cautious with logging potentially large/sensitive data
-        // channelCacheData remains {}
-    }
-
     // Initialize cache for events_edit_modal.js if its initCache function is available
-    // This replaces the previous block: var rawJsonData = ...; try { var parsedCacheData = JSON.parse(rawJsonData); initCache(parsedCacheData); ... }
     if (typeof initCache === "function") {
-        initCache(channelCacheData || {}); // Pass the parsed data
-    } else {
-        // console.warn("initCache function (from events_edit_modal.js) not found at initial parse time."); // Optional warning
+        initCache({}); // Pass empty cache data
     }
 
 /*==========================================================================================
@@ -798,9 +806,6 @@ const FIELDS_KEY = "admin_stats_visible_fields_v2";
 const ORDER_KEY = "admin_stats_column_order_v2";
 
 let allFields = [], eventsData = []; 
-// The 'let channelCacheData = {};' declaration and subsequent try-catch block that previously re-parsed
-// '{{ channel_cache | tojson | safe }}' is removed, as 'channelCacheData' is now populated above.
-// channelCacheData is already defined and populated from the data island.
 
 let displayedEvents = []; // ← holds the current filtered+sorted list
 
@@ -816,59 +821,158 @@ let FILTER_FIELDS = [
   "actions"
 ];
 
-function prettifyFieldName(field) {  // Short display names
-  const displayNames = {
-    "timestamp": "Time",
-    "event": "Event",
-    "edit_timestamp": "Edit Time",
-    "source_channel": "Source ID",
-    "source_channel_name": "Source Channel",
-    "dest_channel": "Dest ID",
-    "dest_channel_name": "Destination",
-    "message_id": "Msg ID",
-    "media_type": "Media",
-    "file_size_bytes": "File Size",
-    "original_size": "Orig Size",
-    "translated_size": "Trans Size",
-    "translation_time": "Trans Time",
-    "retry_count": "Retries",
-    "posting_success": "Status",
-    "api_error_code": "Error Code",
-    "exception_message": "Error",
-    "preview": "Preview",
-    "source_content": "Source",
-    "actions": "Actions"
+function prettifyFieldName(field) {
+  // Enhanced humanization with automatic and manual mappings
+  const manualMappings = {
+    "timestamp": { short: "Time", long: "Timestamp", tooltip: "When the event occurred" },
+    "event": { short: "Type", long: "Event Type", tooltip: "Type of event (create, edit, delete)" },
+    "edit_timestamp": { short: "Edited", long: "Last Edited", tooltip: "When the event was last modified" },
+    "source_channel": { short: "Source ID", long: "Source Channel ID", tooltip: "Numeric ID of the source channel" },
+    "source_channel_name": { short: "Source", long: "Source Channel", tooltip: "Name of the source channel" },
+    "dest_channel": { short: "Dest ID", long: "Destination Channel ID", tooltip: "Numeric ID of the destination channel" },
+    "dest_channel_name": { short: "Destination", long: "Destination Channel", tooltip: "Name of the destination channel" },
+    "message_id": { short: "Message ID", long: "Message ID", tooltip: "Unique identifier for the message" },
+    "dest_message_id": { short: "Dest Msg ID", long: "Destination Message ID", tooltip: "Message ID in destination channel" },
+    "media_type": { short: "Media", long: "Media Type", tooltip: "Type of media attached (photo, video, document)" },
+    "file_size_bytes": { short: "File Size", long: "File Size", tooltip: "Size of attached file in bytes" },
+    "file_path": { short: "File Path", long: "File Path", tooltip: "Path to the media file" },
+    "original_size": { short: "Original", long: "Original Size", tooltip: "Character count of original message" },
+    "translated_size": { short: "Translated", long: "Translated Size", tooltip: "Character count of translated message" },
+    "previous_size": { short: "Previous", long: "Previous Size", tooltip: "Size before edit" },
+    "new_size": { short: "New", long: "New Size", tooltip: "Size after edit" },
+    "translation_time": { short: "Duration", long: "Translation Time", tooltip: "Time taken to translate in seconds" },
+    "retry_count": { short: "Retries", long: "Retry Count", tooltip: "Number of retry attempts made" },
+    "posting_success": { short: "Status", long: "Success Status", tooltip: "Whether the operation completed successfully" },
+    "api_error_code": { short: "Error Code", long: "API Error Code", tooltip: "Error code returned by the API" },
+    "exception_message": { short: "Error", long: "Error Message", tooltip: "Detailed error or exception message" },
+    "preview": { short: "Preview", long: "Message Preview", tooltip: "Preview of the translated message content" },
+    "source_content": { short: "Source", long: "Source Content", tooltip: "Original message content" },
+    "source_message": { short: "Source Msg", long: "Source Message", tooltip: "Full source message content" },
+    "translated_message": { short: "Translation", long: "Translated Message", tooltip: "Full translated message content" },
+    "actions": { short: "Actions", long: "Actions", tooltip: "Available actions (edit, view, delete)" },    // Additional common fields
+    "id": { short: "ID", long: "Identifier", tooltip: "Unique record identifier" },
+    "user_id": { short: "User ID", long: "User ID", tooltip: "User identifier" },
+    "created_at": { short: "Created", long: "Created At", tooltip: "When the record was created" },
+    "updated_at": { short: "Updated", long: "Updated At", tooltip: "When the record was last updated" },
+    "deleted_at": { short: "Deleted", long: "Deleted At", tooltip: "When the record was deleted" },
+    "ip_address": { short: "IP Address", long: "IP Address", tooltip: "Internet Protocol address" },
+    "user_agent": { short: "Browser", long: "User Agent", tooltip: "Browser and device information" },
+    "request_id": { short: "Request ID", long: "Request ID", tooltip: "Unique request identifier" },
+    "response_code": { short: "Response", long: "Response Code", tooltip: "HTTP response status code" },
+    "content_type": { short: "Content", long: "Content Type", tooltip: "MIME type of the content" },
+    "content_length": { short: "Size", long: "Content Length", tooltip: "Size of the content in bytes" },
+    "session_id": { short: "Session", long: "Session ID", tooltip: "User session identifier" },
+    "error_code": { short: "Error Code", long: "Error Code", tooltip: "System error code" },
+    "exception_message": { short: "Error", long: "Error Message", tooltip: "Detailed error description" },
+    "status_code": { short: "Status", long: "Status Code", tooltip: "Operation status code" },
+    "batch_id": { short: "Batch", long: "Batch ID", tooltip: "Processing batch identifier" },
+    "job_id": { short: "Job", long: "Job ID", tooltip: "Background job identifier" },
+    "task_id": { short: "Task", long: "Task ID", tooltip: "Task identifier" },
+    "process_id": { short: "Process", long: "Process ID", tooltip: "System process identifier" },
+    "thread_id": { short: "Thread", long: "Thread ID", tooltip: "Execution thread identifier" }
   };
 
-  // Full names for tooltips
-  const tooltips = {
-    "timestamp": "When the event occurred",
-    "event": "Type of event",
-    "edit_timestamp": "When the event was last edited",
-    "source_channel": "Source channel ID",
-    "source_channel_name": "Source channel name",
-    "dest_channel": "Destination channel ID",
-    "dest_channel_name": "Destination channel name",
-    "message_id": "Message ID",
-    "media_type": "Type of media attached",
-    "file_size_bytes": "Size of attached file in bytes",
-    "original_size": "Original message size",
-    "translated_size": "Translated message size",
-    "translation_time": "Time taken to translate",
-    "retry_count": "Number of retry attempts",
-    "posting_success": "Whether posting succeeded",
-    "api_error_code": "API error code if any",
-    "exception_message": "Exception message if any",
-    "preview": "Preview of translated message",
-    "source_content": "Original message content",
-    "actions": "Edit or view details"
-  };
+  // Check for manual mapping first
+  if (manualMappings[field]) {
+    return manualMappings[field];
+  }
 
-  const name = displayNames[field] || field;
+  // Automatic humanization for unmapped fields
+  let humanized = field;
+  
+  // Handle common patterns and transformations
+  humanized = humanized
+    // Remove common prefixes
+    .replace(/^(event_|user_|customer_|admin_|api_)/i, '')
+    // Remove trailing _id, _ids, _at, _count, _type
+    .replace(/_(ids?|at|count|type)$/i, '')
+    // Split on underscores and camelCase
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, ' ')
+    // Handle numeric suffixes
+    .replace(/(\d+)$/g, ' $1')
+    // Handle common abbreviations and technical terms
+    .replace(/\bapi\b/gi, 'API')
+    .replace(/\burl\b/gi, 'URL')
+    .replace(/\bhttp\b/gi, 'HTTP')
+    .replace(/\bhttps\b/gi, 'HTTPS')
+    .replace(/\bip\b/gi, 'IP')
+    .replace(/\bid\b/gi, 'ID')
+    .replace(/\bjson\b/gi, 'JSON')
+    .replace(/\bxml\b/gi, 'XML')
+    .replace(/\bhtml\b/gi, 'HTML')
+    .replace(/\bcss\b/gi, 'CSS')
+    .replace(/\bjs\b/gi, 'JS')
+    .replace(/\bsql\b/gi, 'SQL')
+    .replace(/\buuid\b/gi, 'UUID')
+    // Capitalize each word
+    .split(' ')
+    .map(word => {
+      if (!word) return word;
+      // Keep certain abbreviations uppercase (already handled above, but ensure consistency)
+      const upperCaseWords = ['ID', 'API', 'URL', 'HTTP', 'HTTPS', 'JSON', 'XML', 'HTML', 'CSS', 'JS', 'SQL', 'UUID', 'IP'];
+      const upperWord = word.toUpperCase();
+      if (upperCaseWords.includes(upperWord)) {
+        return upperWord;
+      }
+      // Regular capitalization
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ')
+    // Clean up extra spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Generate meaningful tooltip
+  const tooltip = `Information about ${humanized.toLowerCase()}`;
+  
+  // Create short version (limit to ~15 characters for table headers)
+  let short = humanized;
+  if (humanized.length > 15) {
+    const words = humanized.split(' ');
+    if (words.length > 1) {
+      // Create intelligent abbreviations
+      if (words.length === 2) {
+        // For two words, use first word + first letter of second
+        short = words[0] + ' ' + words[1].charAt(0);
+      } else if (words.length > 2) {
+        // For multiple words, try using first letters of each word
+        const initials = words.map(w => w.charAt(0)).join('');
+        if (initials.length >= 3 && initials.length <= 8) {
+          short = initials;
+        } else {
+          // Use first word + abbreviation indicator
+          short = words[0] + '+';
+        }
+      }
+    } else {
+      // Single long word - intelligently truncate
+      if (humanized.includes(' ')) {
+        // If somehow has spaces but was treated as single word
+        short = humanized.substring(0, 12) + '...';
+      } else {
+        // Try to find a natural break point (vowel after consonant)
+        let truncatePoint = 12;
+        for (let i = 8; i < Math.min(12, humanized.length); i++) {
+          if (/[aeiou]/i.test(humanized[i]) && /[bcdfghjklmnpqrstvwxyz]/i.test(humanized[i-1])) {
+            truncatePoint = i;
+            break;
+          }
+        }
+        short = humanized.substring(0, truncatePoint) + '...';
+      }
+    }
+  }
+
+  // Ensure short name is at least 2 characters
+  if (short.length < 2) {
+    short = humanized.substring(0, Math.min(8, humanized.length));
+  }
 
   return {
-    short: name,  // Short name for table header
-    tooltip: tooltips[field] || name // Fallback tooltip to the formatted name
+    short: short,
+    long: humanized,
+    tooltip: tooltip
   };
 }
 
@@ -878,13 +982,13 @@ function getVisibleFields() {
   // Default minimal set of visible fields
   return [
     "timestamp",
-    "event",
+    "event",          // Type column
     // "source_channel", // ID might be too much for default view
     "source_channel_name",
     // "dest_channel",   // ID might be too much for default view
     "dest_channel_name",
     "message_id",
-    "posting_success",
+    "posting_success", // Status column
     "preview",        // Translated message from event
     "actions"         // Always include actions column
   ];
@@ -929,75 +1033,326 @@ function showPreviewModal(htmlContent) { // Renamed param for clarity
   openModal("preview-modal");
 }
 
-function renderColumnChooserHtml() {
+function showColumnChooser() {
+  // Use the existing static modal instead of updateModal to preserve search functionality
+  const modal = document.getElementById("column-chooser-modal");
+  const selectedColumnList = document.getElementById("selected-column-list");
+  const availableColumnList = document.getElementById("available-column-list");
+  
+  // Clear existing content
+  selectedColumnList.innerHTML = '';
+  availableColumnList.innerHTML = '';
+  
+  // Generate column items directly into the static modal
   const order = getColumnOrder();
   const visibleFields = getVisibleFields();
-  let html = `<div class="column-chooser-list">`;
+  
+  // Separate selected and available columns
+  const selectedColumns = [];
+  const availableColumns = [];
+  
   order.forEach(field => {
     const isVisible = visibleFields.includes(field);
-    const fieldNameParts = prettifyFieldName(field); // Returns {short: ..., tooltip: ...}
-    const displayName = fieldNameParts.short;
-    const tooltipText = fieldNameParts.tooltip || '';
-    // Use string concatenation for HTML generation to avoid issues with backticks in Jinja context
-    html += 
-      '<div class="column-chooser-li" data-field="' + field + '" title="' + tooltipText + '">' +
-        '<div class="flex items-center gap-2">' +
-          '<i class="fas fa-grip-vertical drag-handle"></i>' +
-          '<label class="flex items-center gap-2 cursor-pointer">' +
-            '<input type="checkbox" data-field="' + field + '" ' + (isVisible ? 'checked' : '') + ' class="form-checkbox h-4 w-4 text-blue-600">' +
-            '<span class="select-none">' + displayName + '</span>' +
-          '</label>' +
-        '</div>' +
-      '</div>';
+    if (isVisible) {
+      selectedColumns.push(field);
+    } else {
+      availableColumns.push(field);
+    }
   });
-  html += '</div>';
-  return html;
+  
+  // Render selected columns
+  selectedColumns.forEach(field => {
+    const columnItem = createColumnItem(field, true);
+    selectedColumnList.appendChild(columnItem);
+  });
+  
+  // Render available columns
+  availableColumns.forEach(field => {
+    const columnItem = createColumnItem(field, false);
+    availableColumnList.appendChild(columnItem);
+  });
+  
+  // Update counts
+  updateColumnCounts();
+  
+  // Show the modal
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+  
+  // Initialize Sortable for drag and drop on both lists
+  initializeSortable(selectedColumnList, true);
+  initializeSortable(availableColumnList, false);
+  
+  // Initialize search functionality
+  initializeColumnSearch();
+  
+  // Initialize bulk action buttons
+  initializeBulkActions();
 }
 
-function showColumnChooser() {
-  let chooserHtml = renderColumnChooserHtml();
-  // Use string concatenation for HTML generation
-  updateModal("column-chooser-modal", "Customize Columns", 
-    '<div class="mb-3 text-sm text-gray-600">' +
-      'Drag to reorder. Check to show. Default view shows essential fields.' +
-     '</div>' +
-     '<div id="columnChooserListContainer">' + chooserHtml + '</div>', 
-    '<button onclick="applyColumnChangesAndClose()" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Apply</button>' +
-     '<button onclick="closeModal(&#39;column-chooser-modal&#39;)" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 ml-2">Cancel</button>');
+function createColumnItem(field, isSelected) {
+  const fieldNameParts = prettifyFieldName(field);
+  const displayName = fieldNameParts.short;
+  const tooltipText = fieldNameParts.tooltip || '';
   
-  openModal("column-chooser-modal");
+  const columnItem = document.createElement('li');
+  columnItem.className = `column-chooser-li ${isSelected ? 'selected' : 'available'}`;
+  columnItem.setAttribute('data-field', field);
+  columnItem.setAttribute('title', tooltipText);
   
-  const listContainer = document.getElementById("columnChooserListContainer");
-  const actualList = listContainer.querySelector(".column-chooser-list"); // Get the actual list element
-
-  listContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener("change", function() {
-      // Changes are applied on "Apply" button click now, direct application removed from here
-    });
+  columnItem.innerHTML = `
+    <div class="drag-handle">
+      <i class="fas fa-grip-vertical"></i>
+    </div>
+    <div class="column-info">
+      <div class="column-name">${displayName}</div>
+      <div class="column-description">${tooltipText}</div>
+    </div>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" data-field="${field}" ${isSelected ? 'checked' : ''}>
+        <span class="slider round"></span>
+      </label>
+    </div>
+  `;
+  
+  // Add change event listener for the checkbox
+  const checkbox = columnItem.querySelector('input[type="checkbox"]');
+  checkbox.addEventListener('change', function() {
+    moveColumnBetweenSections(field, this.checked);
   });
+  
+  return columnItem;
+}
 
-  Sortable.create(actualList, { // Target the actual list for Sortable
+function initializeSortable(listElement, isSelectedList) {
+  if (listElement._sortable) {
+    listElement._sortable.destroy();
+  }
+  
+  listElement._sortable = Sortable.create(listElement, {
+    group: isSelectedList ? 'selected-columns' : 'available-columns',
     handle: ".drag-handle",
     animation: 180,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
     onEnd: function(evt) {
-      // Order is also applied on "Apply" button click
+      // Update column counts after any movement
+      updateColumnCounts();
+    }
+  });
+}
+
+function moveColumnBetweenSections(field, shouldBeSelected) {
+  const selectedList = document.getElementById("selected-column-list");
+  const availableList = document.getElementById("available-column-list");
+  
+  // Find the column item
+  const columnItem = document.querySelector(`[data-field="${field}"]`);
+  if (!columnItem) return;
+  
+  // Animate the transition
+  columnItem.style.transition = 'all 0.2s ease';
+  columnItem.style.transform = 'scale(0.95)';
+  columnItem.style.opacity = '0.7';
+  
+  setTimeout(() => {
+    // Remove from current location
+    columnItem.remove();
+    
+    // Create new item in the correct section
+    const newColumnItem = createColumnItem(field, shouldBeSelected);
+    
+    if (shouldBeSelected) {
+      selectedList.appendChild(newColumnItem);
+      newColumnItem.classList.add('selected');
+      newColumnItem.classList.remove('available');
+    } else {
+      availableList.appendChild(newColumnItem);
+      newColumnItem.classList.add('available');
+      newColumnItem.classList.remove('selected');
+    }
+    
+    // Animate in
+    newColumnItem.style.transition = 'all 0.2s ease';
+    newColumnItem.style.transform = 'scale(1.05)';
+    setTimeout(() => {
+      newColumnItem.style.transform = 'scale(1)';
+    }, 100);
+    
+    // Update counts
+    updateColumnCounts();
+    
+    // Re-initialize sortable if needed
+    if (shouldBeSelected) {
+      initializeSortable(selectedList, true);
+    } else {
+      initializeSortable(availableList, false);
+    }
+  }, 150);
+}
+
+function updateColumnCounts() {
+  const selectedCount = document.getElementById("selected-column-list").children.length;
+  const availableCount = document.getElementById("available-column-list").children.length;
+  
+  document.getElementById("selected-count").textContent = selectedCount;
+  document.getElementById("available-count").textContent = availableCount;
+}
+
+function initializeBulkActions() {
+  const selectAllBtn = document.getElementById("select-all-columns");
+  const clearAllBtn = document.getElementById("clear-all-columns");
+  
+  selectAllBtn.addEventListener('click', function() {
+    const availableItems = document.querySelectorAll('#available-column-list .column-chooser-li');
+    availableItems.forEach(item => {
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  });
+  
+  clearAllBtn.addEventListener('click', function() {
+    const selectedItems = document.querySelectorAll('#selected-column-list .column-chooser-li');
+    selectedItems.forEach(item => {
+      const checkbox = item.querySelector('input[type="checkbox"]');
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+    });
+  });
+}
+
+function initializeColumnSearch() {
+  const columnSearchInput = document.getElementById("column-search");
+  const clearSearchButton = document.getElementById("clear-search");
+  const selectedList = document.getElementById("selected-column-list");
+  const availableList = document.getElementById("available-column-list");
+  
+  if (!columnSearchInput || !selectedList || !availableList) return;
+  
+  columnSearchInput.addEventListener("input", function(e) {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    const selectedItems = selectedList.querySelectorAll(".column-chooser-li");
+    const availableItems = availableList.querySelectorAll(".column-chooser-li");
+    const noResultsMessage = document.getElementById("no-results-message");
+    
+    // Show/hide clear button
+    if (clearSearchButton) {
+      clearSearchButton.classList.toggle('hidden', searchTerm.length === 0);
+    }
+    
+    let visibleCount = 0;
+    
+    // Function to filter items in a list
+    function filterItems(items) {
+      items.forEach(item => {
+        const fieldName = item.getAttribute("data-field");
+        const displayNameEl = item.querySelector('.column-name');
+        const displayName = displayNameEl ? displayNameEl.textContent.toLowerCase() : '';
+        const tooltip = item.getAttribute("title") ? item.getAttribute("title").toLowerCase() : '';
+        
+        // Get humanized field name for comprehensive search
+        const fieldParts = prettifyFieldName(fieldName);
+        const longName = fieldParts.long ? fieldParts.long.toLowerCase() : '';
+        
+        // Create searchable text combining all variants
+        const searchableText = [
+          fieldName.toLowerCase(),
+          displayName,
+          longName,
+          tooltip,
+          fieldName.replace(/_/g, ' ').toLowerCase(),
+          fieldName.replace(/_/g, '').toLowerCase()
+        ].join(' ');
+        
+        // Simple search - if search term is found anywhere in searchable text
+        const matches = searchTerm === '' || searchableText.includes(searchTerm) ||
+          // Enhanced fuzzy matching
+          (searchTerm === 'src' && searchableText.includes('source')) ||
+          (searchTerm === 'dest' && searchableText.includes('destination')) ||
+          (searchTerm === 'msg' && searchableText.includes('message')) ||
+          (searchTerm === 'type' && (searchableText.includes('event') || searchableText.includes('media'))) ||
+          (searchTerm === 'success' && searchableText.includes('posting_success')) ||
+          (searchTerm === 'status' && searchableText.includes('posting_success')) ||
+          (searchTerm === 'error' && (searchableText.includes('error') || searchableText.includes('exception')));
+        
+        if (matches) {
+          item.style.display = 'flex';
+          visibleCount++;
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+    
+    // Filter both selected and available items
+    filterItems(selectedItems);
+    filterItems(availableItems);
+    
+    // Show/hide section headers based on content
+    const selectedSection = selectedList.parentElement;
+    const availableSection = availableList.parentElement;
+    const hasVisibleSelected = Array.from(selectedItems).some(item => item.style.display !== 'none');
+    const hasVisibleAvailable = Array.from(availableItems).some(item => item.style.display !== 'none');
+    
+    if (searchTerm.length > 0) {
+      selectedSection.style.display = hasVisibleSelected ? 'block' : 'none';
+      availableSection.style.display = hasVisibleAvailable ? 'block' : 'none';
+    } else {
+      selectedSection.style.display = 'block';
+      availableSection.style.display = 'block';
+    }
+    
+    // Show/hide no results message
+    if (noResultsMessage) {
+      noResultsMessage.classList.toggle('hidden', !(visibleCount === 0 && searchTerm.length > 0));
+    }
+  });
+  
+  // Clear search functionality
+  if (clearSearchButton) {
+    clearSearchButton.addEventListener("click", function() {
+      columnSearchInput.value = "";
+      columnSearchInput.dispatchEvent(new Event('input'));
+      columnSearchInput.focus();
+    });
+  }
+  
+  // Keyboard shortcuts
+  columnSearchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+      columnSearchInput.value = "";
+      columnSearchInput.dispatchEvent(new Event('input'));
     }
   });
 }
 
 function applyColumnChangesAndClose() {
-    const listContainer = document.getElementById("columnChooserListContainer");
-    const checkboxes = listContainer.querySelectorAll('input[type="checkbox"]');
+    const selectedList = document.getElementById("selected-column-list");
+    const availableList = document.getElementById("available-column-list");
+    
+    // Get selected columns from the selected list
+    const selectedCheckboxes = selectedList.querySelectorAll('input[type="checkbox"]');
     let newVisibleFields = [];
-    checkboxes.forEach(cb => {
+    selectedCheckboxes.forEach(cb => {
         if (cb.checked) {
             newVisibleFields.push(cb.getAttribute("data-field"));
         }
     });
     setVisibleFields(newVisibleFields);
 
-    const orderedElements = listContainer.querySelectorAll(".column-chooser-li");
-    const newOrder = Array.from(orderedElements).map(el => el.getAttribute("data-field"));
+    // Get the new order from the selected list (since that's where users can reorder)
+    const selectedElements = selectedList.querySelectorAll(".column-chooser-li");
+    const selectedOrder = Array.from(selectedElements).map(el => el.getAttribute("data-field"));
+    
+    // Add available columns to maintain complete order
+    const availableElements = availableList.querySelectorAll(".column-chooser-li");
+    const availableOrder = Array.from(availableElements).map(el => el.getAttribute("data-field"));
+    
+    // Combine: selected columns first (in their order), then available columns
+    const newOrder = [...selectedOrder, ...availableOrder];
     setColumnOrder(newOrder);
     
     renderTable(); 
@@ -1084,7 +1439,7 @@ function renderTable() {
     const fieldNameParts = prettifyFieldName(field);
     const th = document.createElement("th");
     // Use string concatenation for className and innerHTML
-    th.className = 'col-header col-' + field;
+    th.className = 'col-header col-' + field + ' px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
     th.dataset.field = field;
     th.title = fieldNameParts.tooltip || fieldNameParts.short;
     th.innerHTML = fieldNameParts.short + ' <span class="sort-arrow"></span>';
@@ -1366,11 +1721,9 @@ function applyFiltersAndRender() {
 //  → INITIALIZATION
 //==========================================================================================
 document.addEventListener("DOMContentLoaded", () => {
-  // console.log("Admin Events page script started."); // This console log is now at the top of the script
-  // Initialize cacheData for the modal script
-  // Ensure channelCacheData is populated before this line, or handle potential undefined state in events_edit_modal.js
+  // console.log("Admin Events page script started."); // This console log is now at the top of the script  // Initialize cacheData for the modal script
   if (typeof initializeCache === "function") {
-    initializeCache(channelCacheData || {}); // Uses the channelCacheData parsed from the data island
+    initializeCache({}); // Pass empty cache data
   } else {
     console.warn("initializeCache function not found. Ensure events_edit_modal.js is loaded and defines it.");
   }
@@ -1422,11 +1775,11 @@ document.addEventListener("DOMContentLoaded", () => {
           if (visibleFields.length === 0) visibleFields = allFields.slice(0, Math.min(5, allFields.length));
           if (!visibleFields.includes("actions")) visibleFields.push("actions");
       }
-      setVisibleFields(visibleFields);
-
-
-      renderTable();
+      setVisibleFields(visibleFields);      renderTable();
       updateTableColumnVisibility(); // Ensure columns are correctly shown/hidden
+      
+      // Check for URL parameters to auto-apply filters
+      checkAndApplyURLFilters();
     })
     .catch(error => {
       console.error("Error fetching events data:", error);
@@ -1442,12 +1795,116 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
       }
     });
-
   document.getElementById("openColumnChooser").addEventListener("click", showColumnChooser);
   document.getElementById("addFilterBtn").addEventListener("click", addFilter);
+
+  // Set up column chooser modal button event listeners
+  const applyButton = document.getElementById("apply-columns");
+  const cancelButton = document.getElementById("cancel-columns");
+  const resetButton = document.getElementById("reset-columns");
+  
+  if (applyButton) {
+    applyButton.addEventListener("click", applyColumnChangesAndClose);
+  }
+  
+  if (cancelButton) {
+    cancelButton.addEventListener("click", () => {
+      closeModal('column-chooser-modal');
+    });
+  }
+    if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      // Reset to default columns - matches getVisibleFields() default
+      const defaultFields = ["timestamp", "event", "source_channel_name", "dest_channel_name", "message_id", "posting_success", "preview", "actions"];
+      setVisibleFields(defaultFields);
+      
+      // Refresh the column chooser display
+      showColumnChooser();
+    });
+  }
 });
 
-// Modal utilities (openModal, closeModal) 
+// Function to check URL parameters and apply filters automatically
+function checkAndApplyURLFilters() {
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  // Check for error filter parameter
+  if (urlParams.get('filter_errors') === 'true') {
+    // Add error filter automatically
+    addErrorFilter();
+  }
+}
+
+// Function to add error filter specifically
+function addErrorFilter() {
+  const filterId = 'filter-errors-' + Date.now();
+  const filterHtml = `
+    <div id="${filterId}" class="filter-bar-row" style="opacity: 0; transform: translateX(-10px);" role="group" aria-label="Error filter criteria">
+      <select class="filter-field" aria-label="Filter field">
+        ${FILTER_FIELDS.map(f => {
+          const fieldName = prettifyFieldName(f);
+          const selected = f === 'posting_success' ? 'selected' : '';
+          return `<option value="${f}" title="${fieldName.tooltip}" ${selected}>${fieldName.short}</option>`;
+        }).join('')}
+      </select>
+      <select class="filter-operator" aria-label="Filter operator">
+        ${FILTER_OPERATORS.map(op => {
+          const selected = op === 'IS' ? 'selected' : '';
+          return `<option value="${op}" ${selected}>${op}</option>`;
+        }).join('')}
+      </select>
+      <input type="text" class="filter-value" 
+        value="false"
+        placeholder="Value (comma-separated for IS/IS NOT)" 
+        aria-label="Filter value"
+        autocomplete="off">
+      <button type="button"
+        class="filter-remove-btn" 
+        onclick="removeFilter('${filterId}')"
+        aria-label="Remove filter">
+        <i class="fas fa-times" aria-hidden="true"></i>
+      </button>
+    </div>`;
+  
+  document.getElementById("filtersContainer").insertAdjacentHTML("beforeend", filterHtml);
+  
+  // Animate the new filter row
+  setTimeout(() => {
+    const filterElement = document.getElementById(filterId);
+    if (filterElement) {
+      filterElement.style.opacity = "1";
+      filterElement.style.transform = "translateX(0)";
+    }
+  }, 10);
+  
+  const newFilterElement = document.getElementById(filterId);
+  if (newFilterElement) {
+    const inputs = newFilterElement.querySelectorAll("select");
+    const valueInput = newFilterElement.querySelector(".filter-value");
+    
+    // Handle immediate changes from dropdowns
+    inputs.forEach(input => input.addEventListener("change", applyFiltersAndRender));
+    
+    // Debounce text input
+    const debouncedFilterUpdate = debounce(applyFiltersAndRender, 300);
+    valueInput.addEventListener("input", debouncedFilterUpdate);
+    
+    // Add keyboard interaction
+    valueInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        valueInput.blur();
+        applyFiltersAndRender();
+      }
+    });
+      // Apply the filter immediately
+    setTimeout(() => {
+      applyFiltersAndRender();
+    }, 100);
+  }
+}
+
+// Modal utilities (openModal, closeModal)
 function openModal(id) {
   const modal = document.getElementById(id);
   const overlay = document.getElementById(id + "-overlay");
@@ -1513,113 +1970,56 @@ function processEventsData(events) {
     }));
 }
 
-/* Event modal script */
-function showEventModal(eventId) {
-  const event = eventsData.find(e => e.id === eventId);
-  if (!event) return;
-
-  const modalBody = `
-    <div class="space-y-4">
-      <div>
-        <strong class="text-gray-700">Event ID:</strong>
-        <span class="text-gray-900">${event.id}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Source Channel:</strong>
-        <span class="text-gray-900">${event.source_channel_name} (${event.source_channel})</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Destination Channel:</strong>
-        <span class="text-gray-900">${event.dest_channel_name} (${event.dest_channel})</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Message ID:</strong>
-        <span class="text-gray-900">${event.message_id}</span>
-      </div>
-      <div>        <strong class="text-gray-700">Event Time:</strong>
-        <span class="text-gray-900">${formatTimestamp(event.timestamp)}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Edit Time:</strong>
-        <span class="text-gray-900">${formatTimestamp(event.edit_timestamp)}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Status:</strong>
-        <span class="text-gray-900">${event.posting_success ? 'Successful' : 'Failed'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Error Code:</strong>
-        <span class="text-gray-900">${event.api_error_code || '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Error Message:</strong>
-        <span class="text-gray-900">${event.exception_message || '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Media Type:</strong>
-        <span class="text-gray-900">${event.media_type || '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">File Size:</strong>
-        <span class="text-gray-900">${event.file_size_bytes ? (event.file_size_bytes / 1024).toFixed(2) + ' KB' : '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Original Size:</strong>
-        <span class="text-gray-900">${event.original_size ? (event.original_size / 1024).toFixed(2) + ' KB' : '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Translated Size:</strong>
-        <span class="text-gray-900">${event.translated_size ? (event.translated_size / 1024).toFixed(2) + ' KB' : '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Translation Time:</strong>
-        <span class="text-gray-900">${event.translation_time ? event.translation_time + ' ms' : '-'}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Retry Count:</strong>
-        <span class="text-gray-900">${event.retry_count || 0}</span>
-      </div>
-      <div>
-        <strong class="text-gray-700">Preview:</strong>
-        <div class="message-preview max-h-40 overflow-auto">
-          ${event.preview ? `<div class="whitespace-pre-wrap">${event.preview}</div>` : '<em>No preview available</em>'}
-        </div>
-      </div>
-      <div>
-        <strong class="text-gray-700">Source Content:</strong>
-        <div class="message-source-content max-h-40 overflow-auto">
-          ${event.source_content ? `<div class="whitespace-pre-wrap">${event.source_content}</div>` : '<em>No source content available</em>'}
-        </div>
-      </div>
-    </div>
-  `;
-
-  updateModal('event-modal', 'Event Details', modalBody, `
-    <button onclick="closeModal('event-modal')" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Close</button>
-  `);
-  openModal('event-modal');
+// Enhanced error handling functions for edit modal
+function populateErrorFields(event) {
+    const errorContainer = document.getElementById('error-container');
+    const apiErrorSection = document.getElementById('api-error-section');
+    const exceptionErrorSection = document.getElementById('exception-error-section');
+    const generalErrorSection = document.getElementById('general-error-section');
+    
+    let hasErrors = false;
+    
+    // Handle API error code
+    if (event.api_error_code) {
+        hasErrors = true;
+        apiErrorSection.classList.remove('hidden');
+        const apiErrorField = document.querySelector('#field-api-error-code span');
+        if (apiErrorField) {
+            apiErrorField.textContent = event.api_error_code;
+        }
+    } else {
+        apiErrorSection.classList.add('hidden');
+    }
+    
+    // Handle exception message
+    if (event.exception_message) {
+        hasErrors = true;
+        exceptionErrorSection.classList.remove('hidden');
+        const exceptionField = document.querySelector('#field-exception-message p');
+        if (exceptionField) {
+            exceptionField.textContent = event.exception_message;
+        }
+    } else {
+        exceptionErrorSection.classList.add('hidden');
+    }
+      // Handle general error (for backwards compatibility)
+    if (!event.api_error_code && !event.exception_message && !event.posting_success) {
+        hasErrors = true;
+        generalErrorSection.classList.remove('hidden');
+        const generalField = document.querySelector('#field-general-error p');
+        if (generalField) {
+            generalField.textContent = 'An error occurred during processing. Check logs for more details.';
+        }
+    } else {
+        generalErrorSection.classList.add('hidden');
+    }
+    
+    // Show/hide main error container
+    if (hasErrors) {
+        errorContainer.classList.remove('hidden');
+    } else {
+        errorContainer.classList.add('hidden');
+    }
 }
-
-// Initialize event handlers for edit/details buttons
-document.addEventListener('DOMContentLoaded', function() {
-    const detailButtons = document.querySelectorAll('[data-action="details"]');
-    const editButtons = document.querySelectorAll('[data-action="edit"]');
-    
-    detailButtons.forEach(button => {
-        button.addEventListener('click', function(event) {
-            event.stopPropagation();
-            const eventId = this.getAttribute('data-event-id');
-            showDetailsModal(eventId);
-        });
-    });
-    
-    editButtons.forEach(button => {
-        button.addEventListener('click', function(event) {
-            event.stopPropagation();
-            const eventId = this.getAttribute('data-event-id');
-            showEventModal(eventId);
-        });
-    });
-});
-  </script>
+</script>
 {% endblock %}

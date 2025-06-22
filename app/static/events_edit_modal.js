@@ -8,6 +8,11 @@ function initCache(data) {
     cacheData = data;
 }
 
+// Alias for backward compatibility
+function initializeCache(data) {
+    return initCache(data);
+}
+
 function findCachedMessage(channelId, messageId) {
     if (!cacheData || !channelId || !messageId) return null;
     
@@ -541,6 +546,189 @@ function updateSizeChangeIndicator(previousSize, newSize) {
     }
 }
 
+// Enhanced error handling utility functions
+
+// Copy text to clipboard with feedback
+function copyToClipboard(text) {
+    if (!text || text.trim() === '') {
+        showToast('No text to copy', 'warning');
+        return;
+    }
+    
+    navigator.clipboard.writeText(text.trim()).then(() => {
+        showToast('Copied to clipboard', 'success');
+    }).catch(err => {
+        console.error('Failed to copy to clipboard:', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text.trim();
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            showToast('Copied to clipboard', 'success');
+        } catch (fallbackErr) {
+            console.error('Fallback copy failed:', fallbackErr);
+            showToast('Failed to copy to clipboard', 'error');
+        }
+        document.body.removeChild(textArea);
+    });
+}
+
+// Enhanced copy all error information function
+function copyErrorToClipboard() {
+    const errorInfo = [];
+    const eventId = currentEventObj ? currentEventObj.id : 'Unknown';
+    const timestamp = currentEventObj ? currentEventObj.timestamp : new Date().toISOString();
+    
+    // Add header information
+    errorInfo.push(`=== Error Information ===`);
+    errorInfo.push(`Event ID: ${eventId}`);
+    errorInfo.push(`Timestamp: ${timestamp}`);
+    errorInfo.push(`Event Type: ${currentEventObj ? currentEventObj.event : 'Unknown'}`);
+    errorInfo.push('');
+    
+    // Collect API error code
+    const apiErrorElement = document.querySelector('#field-api-error-code span');
+    const apiErrorSection = document.getElementById('api-error-section');
+    if (apiErrorElement && !apiErrorSection.classList.contains('hidden')) {
+        errorInfo.push(`API Error Code: ${apiErrorElement.textContent.trim()}`);
+        errorInfo.push('');
+    }
+    
+    // Collect exception message
+    const exceptionElement = document.querySelector('#field-exception-message p');
+    const exceptionSection = document.getElementById('exception-error-section');
+    if (exceptionElement && !exceptionSection.classList.contains('hidden')) {
+        errorInfo.push(`Exception Message:`);
+        errorInfo.push(exceptionElement.textContent.trim());
+        errorInfo.push('');
+    }
+    
+    // Collect general error
+    const generalElement = document.querySelector('#field-general-error p');
+    const generalSection = document.getElementById('general-error-section');
+    if (generalElement && !generalSection.classList.contains('hidden')) {
+        errorInfo.push(`General Error:`);
+        errorInfo.push(generalElement.textContent.trim());
+        errorInfo.push('');
+    }
+    
+    // Add channel information for context
+    if (currentEventObj) {
+        errorInfo.push(`=== Context Information ===`);
+        errorInfo.push(`Source Channel: ${currentEventObj.source_channel || 'N/A'} (${currentEventObj.source_channel_name || 'Unknown'})`);
+        errorInfo.push(`Destination Channel: ${currentEventObj.dest_channel || 'N/A'} (${currentEventObj.dest_channel_name || 'Unknown'})`);
+        errorInfo.push(`Message ID: ${currentEventObj.message_id || 'N/A'}`);
+        errorInfo.push(`Posting Success: ${currentEventObj.posting_success ? 'Yes' : 'No'}`);
+    }
+    
+    if (errorInfo.length > 4) { // More than just header
+        const errorText = errorInfo.join('\n');
+        copyToClipboard(errorText);
+    } else {
+        showToast('No error information to copy', 'warning');
+    }
+}
+
+// Show error help modal or information
+function showErrorHelp() {
+    const helpContent = `
+        <div class="space-y-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 class="flex items-center gap-2 text-lg font-semibold text-blue-800 mb-3">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Error Debugging Guide</span>
+                </h4>
+                
+                <div class="space-y-3 text-sm text-blue-700">
+                    <div>
+                        <strong>API Error Codes:</strong> Numeric codes returned by the Telegram API indicating specific issues (rate limits, permissions, etc.)
+                    </div>
+                    <div>
+                        <strong>Exception Messages:</strong> Detailed technical error messages from the application code that can help identify the root cause
+                    </div>
+                    <div>
+                        <strong>General Errors:</strong> High-level error descriptions for cases where specific codes aren't available
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h5 class="flex items-center gap-2 text-md font-semibold text-yellow-800 mb-2">
+                    <i class="fas fa-lightbulb"></i>
+                    <span>Common Solutions</span>
+                </h5>
+                <ul class="text-sm text-yellow-700 space-y-1 list-disc list-inside">
+                    <li>Check channel permissions and bot access</li>
+                    <li>Verify message content doesn't violate Telegram policies</li>
+                    <li>Ensure channel IDs are correct and accessible</li>
+                    <li>Check for rate limiting issues</li>
+                    <li>Verify network connectivity</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    // Create and show help modal
+    const helpModal = document.createElement('div');
+    helpModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    helpModal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="border-b border-gray-200 px-6 py-4">
+                <h3 class="text-xl font-semibold text-gray-900">Error Debugging Help</h3>
+            </div>
+            <div class="p-6">
+                ${helpContent}
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 flex justify-end">
+                <button type="button" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        onclick="this.closest('.fixed').remove()">
+                    Got it
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(helpModal);
+    
+    // Close on backdrop click
+    helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+            helpModal.remove();
+        }
+    });
+}
+
+// Enhanced view error in logs function
+function viewErrorInLogs() {
+    if (!currentEventObj) {
+        showToast('No event data available for log viewing', 'warning');
+        return;
+    }
+    
+    // Create a detailed log entry for searching
+    const logQuery = [];
+    if (currentEventObj.message_id) logQuery.push(`message_id:${currentEventObj.message_id}`);
+    if (currentEventObj.source_channel) logQuery.push(`channel:${currentEventObj.source_channel}`);
+    if (currentEventObj.timestamp) {
+        const date = new Date(currentEventObj.timestamp);
+        logQuery.push(`date:${date.toISOString().split('T')[0]}`);
+    }
+    
+    const searchTerms = logQuery.join(' ');
+    
+    // For now, copy search terms and show instructions
+    copyToClipboard(searchTerms);
+    
+    showToast(`Log search terms copied! Use these to search your application logs: "${searchTerms}"`, 'info');
+    
+    // Future enhancement: Could integrate with actual log viewing system
+    console.log('Log search terms for error investigation:', searchTerms);
+    console.log('Event details for log correlation:', currentEventObj);
+}
+
 // Initialize event handlers when the DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Set up form submission handler
@@ -555,5 +743,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const modalId = btn.closest('.modal-overlay').id;
             hideModal(modalId);
         });
+    });
+    
+    // Set up keyboard shortcuts for error actions
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+Shift+C to copy error information
+        if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer && !errorContainer.classList.contains('hidden')) {
+                e.preventDefault();
+                copyErrorToClipboard();
+            }
+        }
+        
+        // Ctrl+Shift+H to show error help
+        if (e.ctrlKey && e.shiftKey && e.key === 'H') {
+            const errorContainer = document.getElementById('error-container');
+            if (errorContainer && !errorContainer.classList.contains('hidden')) {
+                e.preventDefault();
+                showErrorHelp();
+            }
+        }
     });
 });

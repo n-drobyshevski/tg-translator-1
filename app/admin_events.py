@@ -1,14 +1,11 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import current_user, login_required
-import os
 from translator.config import DEFAULT_STATS
 from html import escape
 import bleach
 from translator.services.event_logger import EventRecorder
 from typing import Dict, Any
 import logging
-import json
-from pathlib import Path
 
 admin_stats_bp = Blueprint("admin_stats_bp", __name__)
 event_recorder = EventRecorder()
@@ -33,25 +30,11 @@ def get_safe_events() -> Dict[str, Any]:
         stats = DEFAULT_STATS.copy()
     return stats
 
-def get_channel_cache():
-    """Get channel cache data with error handling"""
-    try:
-        cache_path = Path("translator/cache/channel_cache.json")
-        if not cache_path.exists():
-            logging.warning("Channel cache file not found")
-            return {}
-        with open(cache_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logging.error(f"Failed to load channel cache: {e}")
-        return {}
-
 @admin_stats_bp.route("/admin/events", methods=["GET"])
 @login_required
 def admin_stats():
     stats = get_safe_events()
-    channel_cache = get_channel_cache()
-    return render_template("admin_events.html", stats=stats, channel_cache=channel_cache, active_page="events")
+    return render_template("admin_events.html", stats=stats, active_page="events")
 
 @admin_stats_bp.route("/admin/events/detail", methods=["GET"])
 def admin_stats_detail():
@@ -63,33 +46,6 @@ def admin_stats_detail():
     raw = stats.get("messages", [])[-100:]  # Get last 100 events
     safe = escape_json_strings(raw)
     return jsonify({"events_last_100": safe})
-
-@admin_stats_bp.route("/admin/cache/json", methods=["GET"])
-@login_required
-def admin_cache_json():
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        # Get channel cache from event recorder
-        event_recorder._load_base()  # Refresh from disk
-        channel_cache = event_recorder.get_channel_cache()
-        
-        if not channel_cache:
-            logging.warning("No channel cache data found")
-            return jsonify({"channels": {}})
-            
-        # Ensure proper structure and escape strings
-        safe_cache = {
-            "channels": escape_json_strings(channel_cache)
-        }
-        
-        logging.debug(f"Returning channel cache: {safe_cache}")
-        return jsonify(safe_cache)
-        
-    except Exception as e:
-        logging.error(f"Failed to load channel cache: {e}")
-        return jsonify({"error": str(e)}), 500
 
 @admin_stats_bp.route("/admin/events/edit", methods=["POST"])
 @login_required
