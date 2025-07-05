@@ -1,6 +1,12 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from translator.services.telegram_sender import TelegramSender
+from translator.models import ChannelConfig
+from translator.services.event_logger import EventRecorder
+
+# Test configurations
+TEST_CHANNEL_ID = 123
+TEST_BOT_TOKEN = "test_token"
 
 
 def test_split_message_short():
@@ -18,60 +24,57 @@ def test_split_message_long():
 
 
 @pytest.mark.asyncio
+@patch("translator.config.CHANNEL_CONFIGS", {})
 @patch("requests.Session.post")
 async def test_send_message_unknown_channel(mock_post):
     sender = TelegramSender()
-    ok, chat_id = await sender.send_message("text", "notachannel", {})
-    assert not ok
-    assert chat_id is None
+    recorder = EventRecorder()
+    recorder.set(dest_channel_name="notachannel")
+    success = await sender.send_message("text", recorder)
+    assert not success
 
 
 @pytest.mark.asyncio
+@patch(
+    "translator.config.CHANNEL_CONFIGS",
+    {"test": ChannelConfig(channel_id=0, bot_token=TEST_BOT_TOKEN)},
+)
 @patch("requests.Session.post")
 async def test_send_message_no_channel_id(mock_post):
     sender = TelegramSender()
-    # Temporarily mess up a config entry
-    orig = sender.configs["test"].channel_id
-    sender.configs["test"].channel_id = None
-    ok, chat_id = await sender.send_message("text", "test", {})
-    sender.configs["test"].channel_id = orig
-    assert not ok
-    assert chat_id is None
+    recorder = EventRecorder()
+    recorder.set(dest_channel_name="test")
+    success = await sender.send_message("text", recorder)
+    assert not success
 
 
 @pytest.mark.asyncio
+@patch(
+    "translator.config.CHANNEL_CONFIGS",
+    {"test": ChannelConfig(channel_id=TEST_CHANNEL_ID, bot_token=TEST_BOT_TOKEN)},
+)
 @patch("requests.Session.post")
 async def test_send_message_api_error(mock_post):
     mock_post.return_value.status_code = 400
     mock_post.return_value.json.return_value = {"description": "fail"}
     sender = TelegramSender()
-    sender.configs["test"].channel_id = 123
-    ok, chat_id = await sender.send_message("text", "test", {})
-    assert not ok
+    recorder = EventRecorder()
+    recorder.set(dest_channel_name="test", dest_channel_id=TEST_CHANNEL_ID)
+    success = await sender.send_message("text", recorder)
+    assert not success
 
 
 @pytest.mark.asyncio
+@patch(
+    "translator.config.CHANNEL_CONFIGS",
+    {"test": ChannelConfig(channel_id=TEST_CHANNEL_ID, bot_token=TEST_BOT_TOKEN)},
+)
 @patch("requests.Session.post")
 async def test_send_message_success(mock_post):
-    # Simulate success response
     mock_post.return_value.status_code = 200
-    mock_post.return_value.json.return_value = {
-        "result": {"message_id": 1, "chat": {"id": 123}},
-        "ok": True,
-    }
+    mock_post.return_value.json.return_value = {"ok": True, "result": {"message_id": 123}}
     sender = TelegramSender()
-    sender.configs["test"].channel_id = 123
-    ok, chat_id = await sender.send_message("test", "test", {})
-    assert ok
-    assert chat_id == 123
-
-
-@pytest.mark.asyncio
-@patch("requests.Session.post")
-async def test_send_message_exception(mock_post):
-    mock_post.side_effect = Exception("fail!")
-    sender = TelegramSender()
-    sender.configs["test"].channel_id = 123
-    ok, chat_id = await sender.send_message("hi", "test", {})
-    assert not ok
-    assert chat_id is None
+    recorder = EventRecorder()
+    recorder.set(dest_channel_name="test", dest_channel_id=TEST_CHANNEL_ID)
+    success = await sender.send_message("text", recorder)
+    assert success

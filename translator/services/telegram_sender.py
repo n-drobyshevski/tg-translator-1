@@ -354,6 +354,8 @@ class TelegramSender:
             recorder.set(
                 dest_message_id=sent_msg_id,
                 posting_success=posting_success,
+                api_error_code=r.status_code if r else None,
+                exception_message=err
             )
             return False 
 
@@ -361,8 +363,12 @@ class TelegramSender:
         sent_msg_id = result.get("message_id")
         posting_success = True
 
-        recorder.set(dest_message_id=sent_msg_id)
-        recorder.set(posting_success=posting_success)
+        recorder.set(
+            dest_message_id=sent_msg_id,
+            posting_success=posting_success,
+            api_error_code=None,
+            exception_message=None
+        )
         logging.info("Successfully sent photo to %s", target)
         return True
 
