@@ -53,9 +53,11 @@ class EventRecorder:
         If one field is given, returns its value.
         If multiple fields are given, returns a tuple of values.
         """
-        if len(fields) == 1:
-            return self.payload.get(fields[0])
-        return tuple(self.payload.get(f) for f in fields)
+        if not fields:
+            raise ValueError("At least one field name must be provided")
+            
+        values = [self.payload.get(f) for f in fields]
+        return values[0] if len(fields) == 1 else tuple(values)
 
     def finalize(self) -> None:
         # Derive event_type if needed

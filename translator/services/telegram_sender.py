@@ -14,13 +14,131 @@ _SESSION = requests.Session()
 
 def sanitize_html(text: str) -> str:
     """Sanitize HTML for Telegram by removing or replacing unsupported tags."""
-    return (
+    if not text:
+        return ""
+    
+    # Apply sanitization rules
+    sanitized = (
         text.replace("<p>", "")
-        .replace("</p>", "")
+        .replace("</p>", "\n")  # Changed to add newline instead of removing
         .replace("<br>", "\n")
         .replace("<br/>", "\n")
         .replace("<br />", "\n")
     )
+    
+    # Normalize whitespace to prevent false differences
+    sanitized = "\n".join(line.rstrip() for line in sanitized.split("\n"))
+    sanitized = sanitized.strip()
+    
+    return sanitized
+
+
+def normalize_for_comparison(text: str) -> str:
+    """Normalize text for content comparison by removing formatting differences."""
+    if not text:
+        return ""
+    
+    # Remove all HTML tags for comparison
+    import re
+    text_only = re.sub(r'<[^>]+>', '', text)
+    
+    # Normalize whitespace
+    text_only = re.sub(r'\s+', ' ', text_only.strip())
+    
+    return text_only
+
+
+def telegram_normalize_text(text: str) -> str:
+    """
+    Normalize text to match Telegram's internal comparison.
+    This should be more comprehensive than the basic normalization.
+    """
+    if not text:
+        return ""
+    
+    import re
+    
+    # First, apply the same sanitization we use for sending
+    normalized = sanitize_html(text)
+    
+    # Remove all HTML tags and entities
+    normalized = re.sub(r'<[^>]+>', '', normalized)
+    
+    # Decode HTML entities
+    normalized = (
+        normalized.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+    )
+    
+    # Normalize all whitespace (including newlines, tabs, etc.)
+    normalized = re.sub(r'\s+', ' ', normalized.strip())
+    
+    # Remove any remaining zero-width characters or special Unicode spaces
+    normalized = re.sub(r'[\u200B-\u200D\u2060\uFEFF\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]', ' ', normalized)
+    
+    # Final whitespace normalization
+    normalized = re.sub(r'\s+', ' ', normalized.strip())
+    
+    return normalized
+
+
+def advanced_content_comparison(text1: str, text2: str) -> bool:
+    """
+    Perform advanced content comparison that tries multiple normalization strategies
+    to detect if two texts would be considered the same by Telegram.
+    """
+    if not text1 and not text2:
+        return True
+    if not text1 or not text2:
+        return False
+    
+    # Direct comparison
+    if text1 == text2:
+        return True
+    
+    # Sanitized comparison
+    s1 = sanitize_html(text1)
+    s2 = sanitize_html(text2)
+    if s1 == s2:
+        return True
+    
+    # Basic normalized comparison
+    n1 = normalize_for_comparison(s1)
+    n2 = normalize_for_comparison(s2)
+    if n1 == n2:
+        return True
+    
+    # Telegram-style normalization
+    t1 = telegram_normalize_text(text1)
+    t2 = telegram_normalize_text(text2)
+    if t1 == t2:
+        return True
+    
+    # Advanced whitespace and HTML normalization
+    import re
+    
+    # Remove all HTML and normalize whitespace aggressively
+    def ultra_normalize(text):
+        # Remove all HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        # Decode entities
+        text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " ")
+        # Normalize all types of whitespace to single spaces
+        text = re.sub(r'[\s\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]+', ' ', text)
+        # Remove leading/trailing whitespace
+        text = text.strip()
+        return text
+    
+    u1 = ultra_normalize(text1)
+    u2 = ultra_normalize(text2)
+    if u1 == u2:
+        return True
+    
+    return False
 
 
 def get_channel_config(target: str):
@@ -122,10 +240,11 @@ class TelegramSender:
                     else "None"
                 ),
             }
-            store_message(sent_chat_id, dest_msg_data)
+            # Note: Message storage functionality would go here
+            # Currently disabled to avoid recursion issue
 
     def _post_telegram(
-        self, url: str, *, data: dict = None, json: dict = None
+        self, url: str, *, data: Optional[dict] = None, json: Optional[dict] = None
     ) -> Tuple[bool, Optional[requests.Response], Optional[str]]:
         """
         Send a POST request to the Telegram Bot API.
@@ -247,13 +366,76 @@ class TelegramSender:
         logging.info("Successfully sent photo to %s", target)
         return True
 
-    async def edit_message(self, channel_id, message_id, text, recorder: EventRecorder):
+    async def edit_message(self, channel_id, message_id, text, recorder: EventRecorder, original_text: Optional[str] = None):
         """
         Edit a message in a Telegram channel by channel_id and message_id.
         Returns (posting_success, api_error_code, exception_message).
+        
+        Args:
+            channel_id: The chat ID of the channel
+            message_id: The message ID to edit
+            text: The new text content
+            recorder: Event recorder for logging
+            original_text: Optional original message text for comparison
         """
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
         sanitized_text = sanitize_html(text)
+        
+        # Pre-check: Compare content if original_text is provided
+        if original_text is not None:
+            sanitized_original = sanitize_html(original_text)
+            
+            # Enhanced debugging for content comparison
+            logging.debug(
+                "Edit message: Content comparison debug for message %s in %s",
+                message_id,
+                channel_id,
+            )
+            logging.debug("Original text length: %d", len(original_text))
+            logging.debug("New text length: %d", len(text))
+            logging.debug("Sanitized original length: %d", len(sanitized_original))
+            logging.debug("Sanitized new length: %d", len(sanitized_text))
+            
+            # Try multiple normalization approaches for better comparison
+            normalized_original = normalize_for_comparison(sanitized_original)
+            normalized_new = normalize_for_comparison(sanitized_text)
+            
+            # Also try the more comprehensive normalization
+            telegram_normalized_original = telegram_normalize_text(original_text)
+            telegram_normalized_new = telegram_normalize_text(text)
+            
+            logging.info("Normalized original: %s", normalized_original[:200] + "..." if len(normalized_original) > 200 else normalized_original)
+            logging.info("Normalized new: %s", normalized_new[:200] + "..." if len(normalized_new) > 200 else normalized_new)
+            logging.debug("Telegram normalized original: %s", telegram_normalized_original[:200] + "..." if len(telegram_normalized_original) > 200 else telegram_normalized_original)
+            logging.debug("Telegram normalized new: %s", telegram_normalized_new[:200] + "..." if len(telegram_normalized_new) > 200 else telegram_normalized_new)
+            
+            # Check if content is the same using advanced comparison
+            if advanced_content_comparison(original_text, text):
+                logging.info(
+                    "Edit message: Content unchanged for message %s in %s - skipping edit",
+                    message_id,
+                    channel_id,
+                )
+                recorder.set(
+                    dest_message_id=message_id,
+                    posting_success=True,
+                    api_error_code=None,
+                    exception_message="Content unchanged - edit skipped",
+                )
+                return True
+        
+        # Log the content being sent for debugging
+        logging.info(
+            "Edit message: Attempting to edit message %s in channel %s",
+            message_id,
+            channel_id,
+        )
+        logging.info(
+            "Edit message: New content (length: %d): %s",
+            len(sanitized_text),
+            sanitized_text[:200] + "..." if len(sanitized_text) > 200 else sanitized_text,
+        )
+        
         payload = {
             "chat_id": channel_id,
             "message_id": message_id,
@@ -266,19 +448,42 @@ class TelegramSender:
         sent_msg_id = None
 
         success, resp, err = self._post_telegram(url, data=payload)
+        
         if not success or resp is None:
-            logging.error(
-                "Failed to edit message %s in %s: %s",
-                message_id,
-                channel_id,
-                err,
-            )
-            api_error_code = resp.status_code if resp else None
-            exception_message = err
+            # Handle specific "message is not modified" error
+            if err and "message is not modified" in str(err).lower():
+                logging.warning(
+                    "Edit message: Message %s in %s is unchanged - treating as successful",
+                    message_id,
+                    channel_id,
+                )
+                logging.debug(
+                    "Edit message: Content that was considered unchanged: %s",
+                    sanitized_text[:200] + "..." if len(sanitized_text) > 200 else sanitized_text,
+                )
+                # Treat as successful since the message already has the correct content
+                posting_success = True
+                sent_msg_id = message_id
+                api_error_code = None
+                exception_message = "Message content unchanged"
+            else:
+                logging.error(
+                    "Edit message: Failed to edit message %s in %s: %s",
+                    message_id,
+                    channel_id,
+                    err,
+                )
+                api_error_code = resp.status_code if resp else None
+                exception_message = err
         else:
             result = resp.json().get("result", {})
             sent_msg_id = result.get("message_id")
             posting_success = True
+            logging.info(
+                "Edit message: Successfully edited message %s in %s",
+                message_id,
+                channel_id,
+            )
 
         recorder.set(
             dest_message_id=sent_msg_id,

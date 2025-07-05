@@ -172,6 +172,73 @@ class Config:
         """
         return [info.channel_id for info in self.channels.values() if info.channel_type == "source"]
 
+    def get_destination_msg_id(self, source_channel_id: int, message_id: str) -> str | None:
+        """
+        Get the destination message ID for a given source channel and message ID.
+        
+        Args:
+            source_channel_id (int): The source channel ID
+            message_id (str): The source message ID
+
+        Returns:
+            str: The destination message ID if found, None otherwise
+
+        Raises:
+            ValueError: If the input parameters are invalid
+            FileNotFoundError: If events.json cannot be loaded
+            json.JSONDecodeError: If events.json is malformed
+        """
+        import json
+        import logging
+        from pathlib import Path
+        from .models import MessageEvent
+
+        if not isinstance(source_channel_id, int):
+            raise ValueError("source_channel_id must be an integer")
+        if not message_id:
+            raise ValueError("message_id cannot be empty")
+
+        # Convert to strings for comparison since events log stores them as strings
+        source_channel_id_str = str(source_channel_id)
+        message_id_str = str(message_id)
+
+        # Get path to events.json
+        events_path = Path(EVENTS_PATH)
+        if not events_path.exists():
+            logging.warning(f"Events file not found: {events_path}")
+            return None
+
+        try:
+            # Load and parse events.json
+            with open(events_path, "r", encoding="utf-8") as f:
+                events_data = json.load(f)
+                
+            # Search through messages in reverse order (newest first) to get the latest state
+            # This handles cases where a message may have been reposted or edited
+            for event in reversed(events_data.get("messages", [])):
+                if (str(event["source_channel_id"]) == source_channel_id_str and 
+                    str(event["message_id"]) == message_id_str and
+                    event["dest_message_id"] is not None):  # Ensure we have a valid destination ID
+                    # Found a match - return the destination message ID
+                    logging.debug(
+                        f"Found mapping: source channel {source_channel_id}, "
+                        f"message {message_id} -> destination message {event['dest_message_id']}"
+                    )
+                    return str(event["dest_message_id"])
+
+            # No matching event found
+            logging.debug(
+                f"No event found mapping source channel {source_channel_id}, "
+                f"message {message_id} to a destination message"
+            )
+            return None
+
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse events.json: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"Error searching events log: {e}")
+            return None
 
 # Singleton config
 CONFIG = Config()

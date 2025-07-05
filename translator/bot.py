@@ -319,25 +319,48 @@ def register_handlers(
         exception_message = None
         api_error_code = None
 
-        dest_id = CONFIG.get_destination_id(recorder.get("source_channel_id"))
-        recorder.set(dest_channel_id=dest_id)
-        recorder.set(dest_channel_name=CONFIG.get_channel_name(dest_id))
-        pyro_log.info(
-            "Source channel: %s (%s), Dest - id: %s",
-            recorder.get("source_channel_name"),
-            recorder.get("source_channel_id"),
-            dest_id,
-        )
-
         try:
+            # Get destination message ID from events log
+            source_channel_id: int = msg.chat.id  # Use message's channel ID directly
+            message_id: str = str(msg.id)  # Convert message ID to string
+            
+            # Record source info first
+            recorder.set(
+                source_channel_id=source_channel_id,
+                message_id=message_id
+            )
+
+            # Get destination message mapping
+            dest_id = CONFIG.get_destination_msg_id(source_channel_id, message_id)
+            if not dest_id:
+                raise ValueError(
+                    f"No destination message found for source channel {source_channel_id}, "
+                    f"message {message_id}"
+                )
+
+            # Get destination channel info
+            dest_channel_id = CONFIG.get_destination_id(source_channel_id)
+            recorder.set(
+                dest_channel_id=dest_channel_id,
+                dest_channel_name=CONFIG.get_channel_name(dest_channel_id)
+            )
+            
+            pyro_log.info(
+                "Source channel: %s (%s), Dest channel: %s (%s), Dest msg: %s",
+                msg.chat.title,
+                source_channel_id,
+                recorder.get("dest_channel_name"),
+                dest_channel_id,
+                dest_id
+            )
+
             pyro_log.info("Translating edited message %s → %s...", msg.id, dest_id)
             translated = await run_with_retries(translate_html, anthropic, payload)
             pyro_log.info("Translated.")
 
             # Now edit the message in the dest channel
-            # edit_message is a synchronous function, so call it directly (do not await run_with_retries)
             await run_with_retries(
-                sender.edit_message, dest_id, msg.id, translated, recorder
+                sender.edit_message, dest_channel_id, dest_id, translated, recorder
             )
             pyro_log.info(
                 "EDIT DONE chat:%s msg:%s → destination msg: %s",
