@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for, abort
 import requests
@@ -90,6 +91,72 @@ def get_target_channels():
     ]
 
 
+def clean_telegram_html(content: str) -> str:
+    """Clean and format HTML content specifically for Telegram API.
+    
+    This function produces HTML that works well with the existing TelegramSender.
+    It's conservative to avoid the 'B' (Bad Request) error from Telegram API.
+    
+    Args:
+        content: Raw HTML content
+        
+    Returns:
+        str: Cleaned content safe for Telegram
+    """
+    if not content:
+        return ""
+    
+    # Pre-process: Convert strong/em to b/i before cleaning
+    # This ensures they're preserved during bleach cleaning
+    content = re.sub(r'<strong>(.*?)</strong>', r'<b>\1</b>', content)
+    content = re.sub(r'<em>(.*?)</em>', r'<i>\1</i>', content)
+    
+    # Be more conservative with allowed tags to avoid API errors
+    # Only use the most basic and well-supported Telegram HTML tags
+    telegram_allowed_tags = ['b', 'i', 'u', 'a', 'code']
+    telegram_allowed_attributes = {
+        'a': ['href']
+    }
+    
+    # Clean with bleach - this removes unsupported tags and attributes
+    cleaned = bleach.clean(
+        content,
+        tags=telegram_allowed_tags,
+        attributes=telegram_allowed_attributes,
+        strip=True
+    )
+    
+    # Convert <p> to line breaks (compatible with existing sanitize_html)
+    cleaned = re.sub(r'<p[^>]*>', '', cleaned)
+    cleaned = re.sub(r'</p>', '\n', cleaned)
+    
+    # Convert <br> variants to newlines (compatible with existing sanitize_html)
+    cleaned = re.sub(r'<br[^>]*/?>', '\n', cleaned)
+    
+    # Remove empty tags that might cause issues
+    cleaned = re.sub(r'<([a-z]+)></\1>', '', cleaned)
+    cleaned = re.sub(r'<([a-z]+)\s*/>(?!</)', '', cleaned)
+    
+    # Remove nested identical tags to prevent API issues
+    for tag in ['b', 'i', 'u', 'code']:
+        pattern = f'<{tag}>(<{tag}>.*?</{tag}>)</{tag}>'
+        while re.search(pattern, cleaned):
+            cleaned = re.sub(pattern, r'\1', cleaned)
+    
+    # Clean up multiple consecutive line breaks
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    
+    # Remove leading/trailing whitespace
+    cleaned = cleaned.strip()
+    
+    # Final safety check: if cleaning resulted in empty content, use original text-only version
+    if not cleaned:
+        text_only = bleach.clean(content, tags=[], strip=True)
+        return text_only.strip()
+    
+    return cleaned
+
+
 def validate_message_content(message_content: str) -> tuple[bool, str]:
     """Validate message content before sending to Telegram.
 
@@ -107,19 +174,33 @@ def validate_message_content(message_content: str) -> tuple[bool, str]:
         print("VALIDATION FAILED: Empty content")
         return False, "Message content is empty"
 
-    # Check if message is just whitespace or HTML tags
-    cleaned_content = bleach.clean(message_content, tags=[], strip=True)
+    # Clean the content for Telegram
+    cleaned_content = clean_telegram_html(message_content)
     print(f"Cleaned content length: {len(cleaned_content)}")
     print(f"Cleaned content preview: {cleaned_content[:100]}..." if cleaned_content else "EMPTY")
 
-    if not cleaned_content.strip():
-        print("VALIDATION FAILED: No visible text")
+    # Check if message is just whitespace after cleaning
+    text_only = bleach.clean(cleaned_content, tags=[], strip=True)
+    if not text_only.strip():
+        print("VALIDATION FAILED: No visible text after cleaning")
         return False, "Message contains no visible text"
 
     # Check Telegram message length limits
-    if len(message_content) > 4096:
-        print("VALIDATION FAILED: Message too long")
+    if len(cleaned_content) > 4096:
+        print("VALIDATION FAILED: Message too long after cleaning")
         return False, "Message exceeds Telegram's 4096 character limit"
+
+    # Additional Telegram-specific validations
+    if cleaned_content != message_content:
+        print(f"VALIDATION INFO: Content was cleaned for Telegram compatibility")
+        print(f"Original length: {len(message_content)}, Cleaned length: {len(cleaned_content)}")
+
+    # Check for problematic patterns that might cause Telegram API errors
+    if re.search(r'<[^>]*[<>][^>]*>', cleaned_content):
+        print("VALIDATION WARNING: Potentially malformed HTML detected")
+        # Try to fix by removing the problematic tags
+        cleaned_content = re.sub(r'<[^>]*[<>][^>]*>', '', cleaned_content)
+        print(f"Fixed content length: {len(cleaned_content)}")
 
     print("VALIDATION PASSED")
     print(f"{'='*50}\n")
@@ -149,24 +230,27 @@ def prepare_message_content(translation_result: str, raw_html_result: str) -> tu
     if not message_to_send:
         print("PREPARATION FAILED: Empty content")
         return False, "", "Message content is empty"
-        
-    # Check if message is just whitespace or HTML tags
-    cleaned_content = bleach.clean(message_to_send, tags=[], strip=True)
-    print(f"Cleaned content length: {len(cleaned_content)}")
-    print(f"Cleaned content preview: {cleaned_content[:100]}..." if cleaned_content else "EMPTY")
     
-    if not cleaned_content.strip():
-        print("PREPARATION FAILED: No visible text")
-        return False, "", "Message contains no visible text"
+    # Clean the content for Telegram
+    cleaned_message = clean_telegram_html(message_to_send)
+    print(f"Cleaned message length: {len(cleaned_message)}")
+    print(f"Cleaned message preview: {cleaned_message[:100]}..." if cleaned_message else "EMPTY")
+    
+    # Validate the cleaned content
+    text_only = bleach.clean(cleaned_message, tags=[], strip=True)
+    if not text_only.strip():
+        print("PREPARATION FAILED: No visible text after cleaning")
+        return False, "", "Message contains no visible text after cleaning"
         
     # Check Telegram message length limits
-    if len(message_to_send) > 4096:
-        print("PREPARATION FAILED: Message too long")
+    if len(cleaned_message) > 4096:
+        print("PREPARATION FAILED: Message too long after cleaning")
         return False, "", "Message exceeds Telegram's 4096 character limit"
         
     print("PREPARATION PASSED")
+    print(f"Using cleaned message: {cleaned_message != message_to_send}")
     print(f"{'='*50}\n")
-    return True, message_to_send, ""
+    return True, cleaned_message, ""
 
 
 def select_message_to_send(translation_result: str, raw_html_result: str) -> tuple[bool, str, str]:
@@ -199,23 +283,26 @@ def select_message_to_send(translation_result: str, raw_html_result: str) -> tup
         print("SELECTION FAILED: No content available")
         return False, "", "No translated content available"
     
+    # Clean the message for Telegram
+    cleaned_message = clean_telegram_html(message_to_send)
+    
     # Make sure we're not sending the source message
     if message_to_send == raw_html_result and translation_result:
         print("WARNING: Using raw_html_result when translation_result is available")
     
     print(f"\nSelected Message:")
-    print(f"  Length: {len(message_to_send)}")
-    print(f"  Preview: {message_to_send[:100]}...")
+    print(f"  Length: {len(cleaned_message)}")
+    print(f"  Preview: {cleaned_message[:100]}...")
     print(f"  Source: {'translation_result' if message_to_send == translation_result else 'raw_html_result'}")
-    print(f"  Has HTML: {'<' in message_to_send and '>' in message_to_send}")
+    print(f"  Has HTML: {'<' in cleaned_message and '>' in cleaned_message}")
+    print(f"  Was cleaned: {cleaned_message != message_to_send}")
     
-    if '<' in message_to_send and '>' in message_to_send:
-        import re
-        tags = re.findall(r'</?([a-zA-Z0-9]+)[^>]*>', message_to_send)
+    if '<' in cleaned_message and '>' in cleaned_message:
+        tags = re.findall(r'</?([a-zA-Z0-9]+)[^>]*>', cleaned_message)
         print(f"  HTML tags: {list(set(tags))}")
     
     print(f"{'='*50}\n")
-    return True, message_to_send, ""
+    return True, cleaned_message, ""
 
 
 @admin_manager_bp.route("/admin/manager", methods=["GET", "POST"])
@@ -237,6 +324,14 @@ def channel_translate():
         request.form.get("target_channel_id") if request.method == "POST" else None
     )
 
+    # Extract translation results from form for post action
+    form_translation_result = (
+        request.form.get("translation_result") if request.method == "POST" else None
+    )
+    form_raw_html_result = (
+        request.form.get("raw_html_result") if request.method == "POST" else None
+    )
+
     translation_result = ""
     raw_html_result = ""
     rendered_html_result = ""
@@ -255,6 +350,22 @@ def channel_translate():
     # NEW: custom message state
     message_option = request.form.get("message_option")
     custom_message_text = request.form.get("custom_message_text", "")
+    
+    # DEBUG: Log all form data for custom message debugging
+    if message_option == "custom" or action == "translate_custom":
+        print(f"\n{'='*20} CUSTOM MESSAGE DEBUG {'='*20}")
+        print(f"message_option: '{message_option}'")
+        print(f"action: '{action}'")
+        print(f"custom_message_text length: {len(custom_message_text)}")
+        print(f"custom_message_text content: {custom_message_text[:200]}..." if custom_message_text else "EMPTY")
+        print(f"selected_channel_id: {selected_channel_id}")
+        print(f"All form data:")
+        for key, value in request.form.items():
+            if len(str(value)) > 100:
+                print(f"  {key}: [LENGTH:{len(str(value))}] {str(value)[:100]}...")
+            else:
+                print(f"  {key}: {value}")
+        print(f"{'='*50}")
 
     recorder = EventRecorder()
 
@@ -268,14 +379,64 @@ def channel_translate():
         ]
         # Sort by timestamp descending
         msgs = sorted(msgs, key=lambda m: m.get("timestamp", ""), reverse=True)
-        return [
-            {
-                "id": m.get("message_id"),
-                "html": m.get("html", m.get("source_message", "")),
-                "timestamp": datetime.fromisoformat(m.get("timestamp")) if m.get("timestamp") else None,
-            }
-            for m in msgs
-        ]
+        
+        print(f"\n{'='*20} GET_RECENT_MESSAGES DEBUG {'='*20}")
+        print(f"Channel ID: {channel_id}")
+        print(f"Total messages in recorder: {len(recorder.stats.get('messages', []))}")
+        print(f"Filtered messages for channel: {len(msgs)}")
+        
+        # Group messages by message_id and keep the best one (with content and successful posting)
+        message_groups = {}
+        for m in msgs:
+            msg_id = m.get("message_id")
+            if msg_id not in message_groups:
+                message_groups[msg_id] = []
+            message_groups[msg_id].append(m)
+        
+        result = []
+        for msg_id, msg_group in message_groups.items():
+            print(f"Message ID {msg_id}: {len(msg_group)} entries")
+            
+            # Find the best entry: prioritize ones with content and successful posting
+            best_msg = None
+            for m in msg_group:
+                source_content = m.get("source_message", "")
+                is_successful = m.get("posting_success", False)
+                
+                print(f"  Entry: content_len={len(source_content)}, success={is_successful}")
+                
+                if not best_msg:
+                    best_msg = mbest_msg = m
+                elif len(source_content) > len(best_msg.get("source_message", "")) and is_successful:
+                    # Better entry: has more content and is successful
+                    best_msg = m
+                elif len(source_content) > 0 and len(best_msg.get("source_message", "")) == 0:
+                    # Better entry: has content when best doesn't
+                    best_msg = m
+            
+            if best_msg:
+                html_content = best_msg.get("source_message", "")
+                
+                print(f"  Selected best entry: content_len={len(html_content)}")
+                if html_content:
+                    print(f"  Content preview: '{html_content[:100]}...'")
+                else:
+                    print(f"  No content found for message {msg_id}")
+                
+                result.append({
+                    "id": msg_id,
+                    "html": html_content,
+                    "timestamp": datetime.fromisoformat(best_msg.get("timestamp")) if best_msg.get("timestamp") else None,
+                    "chat_title": best_msg.get("source_channel_name", ""),
+                    "chat_username": best_msg.get("source_channel_username", ""),
+                })
+        
+        # Sort by timestamp descending
+        result = sorted(result, key=lambda x: x["timestamp"] or datetime.min, reverse=True)
+        
+        print(f"Returning {len(result)} unique messages")
+        print(f"{'='*50}")
+        return result
 
     # Step 1: Select channel and fetch recent messages
     if (
@@ -286,12 +447,22 @@ def channel_translate():
         recent_messages = get_recent_messages(selected_channel_id)
 
     # ---- CUSTOM MESSAGE HANDLING ----
-    if (
+    print(f"\n{'='*20} CUSTOM MESSAGE CONDITION CHECK {'='*20}")
+    print(f"selected_channel_id: {bool(selected_channel_id)} ({selected_channel_id})")
+    print(f"message_option == 'custom': {message_option == 'custom'} ({message_option})")
+    print(f"action == 'translate_custom': {action == 'translate_custom'} ({action})")
+    print(f"custom_message_text not empty: {bool(custom_message_text)} (length: {len(custom_message_text)})")
+    
+    custom_conditions_met = (
         selected_channel_id
         and message_option == "custom"
         and action == "translate_custom"
         and custom_message_text
-    ):
+    )
+    print(f"All custom conditions met: {custom_conditions_met}")
+    print(f"{'='*50}")
+    
+    if custom_conditions_met:
         selected_message_text = custom_message_text.strip()
         selected_message_id = None
         chat_title = ""
@@ -301,7 +472,22 @@ def channel_translate():
                 chat_title = ch.get("name", "")
                 chat_username = ch.get("username", "")
                 break
+        
+        print(f"\n{'='*20} CUSTOM MESSAGE TRANSLATION CONDITIONS {'='*20}")
+        print(f"selected_channel_is_en: {selected_channel_is_en}")
+        print(f"selected_message_text: {bool(selected_message_text)} (length: {len(selected_message_text)})")
+        print(f"chat_title: {chat_title}")
+        print(f"chat_username: {chat_username}")
+        print(f"{'='*50}")
+        
         if not selected_channel_is_en and selected_message_text:
+            print(f"\n{'='*20} CUSTOM TRANSLATION ATTEMPT {'='*20}")
+            print(f"Selected message text length: {len(selected_message_text)}")
+            print(f"Selected message preview: {selected_message_text[:200]}...")
+            print(f"Channel is English: {selected_channel_is_en}")
+            print(f"Chat title: {chat_title}")
+            print(f"Chat username: {chat_username}")
+            
             try:
                 from translator.bot import translate_html
 
@@ -314,6 +500,7 @@ def channel_translate():
                     html_with_source = (
                         f"{selected_message_text}\n\nSource channel: {chat_title}"
                     )
+                
                 payload = {
                     "Channel": chat_title,
                     "Text": selected_message_text,
@@ -321,24 +508,59 @@ def channel_translate():
                     "Link": f"https://t.me/{chat_title}/0",
                     "Meta": {},
                 }
-                anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+                
+                print(f"Payload created:")
+                print(f"  Channel: {payload['Channel']}")
+                print(f"  Text length: {len(payload['Text'])}")
+                print(f"  Html length: {len(payload['Html'])}")
+                print(f"  Link: {payload['Link']}")
+                
+                # Check API key
+                api_key = os.getenv("ANTHROPIC_API_KEY", "")
+                print(f"API key present: {bool(api_key)}")
+                print(f"API key length: {len(api_key) if api_key else 0}")
+                print(f"API key starts with: {api_key[:10]}..." if api_key else "NO KEY")
+                
+                anthropic_client = Anthropic(api_key=api_key)
+                print("Anthropic client created successfully")
+                
+                print("Calling translate_html...")
                 translation_result = asyncio.run(
                     translate_html(anthropic_client, payload)
                 )
+                print(f"Translation completed. Result length: {len(translation_result) if translation_result else 0}")
+                print(f"Translation preview: {translation_result[:200]}..." if translation_result else "EMPTY")
+                
                 import re
-
                 translation_result = re.sub(r"(</[a-z]+>)+$", "", translation_result)
-                raw_html_result = bleach.clean(
-                    translation_result,
-                    tags=["b", "i", "u", "a", "p", "br"],
-                    attributes={"a": ["href"]},
-                )
+                raw_html_result = clean_telegram_html(translation_result)
                 rendered_html_result = translation_result
+                
+                print(f"Final results:")
+                print(f"  translation_result length: {len(translation_result) if translation_result else 0}")
+                print(f"  raw_html_result length: {len(raw_html_result) if raw_html_result else 0}")
+                print(f"  rendered_html_result length: {len(rendered_html_result) if rendered_html_result else 0}")
+                print(f"{'='*50}")
+                
             except Exception as e:
+                print(f"CUSTOM TRANSLATION ERROR: {e}")
+                print(f"Error type: {type(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
                 translation_result = f"Error during translation: {e}"
-                raw_html_result = translation_result
+                raw_html_result = clean_telegram_html(translation_result)
                 rendered_html_result = translation_result
+                print(f"Set error results, translation_result: {translation_result}")
+        else:
+            print(f"\n{'='*20} CUSTOM TRANSLATION SKIPPED {'='*20}")
+            print(f"Channel is English: {selected_channel_is_en}")
+            print(f"Selected message text present: {bool(selected_message_text)}")
+            print(f"Reason: {'Channel is English' if selected_channel_is_en else 'No message text'}")
+            print(f"{'='*50}")
         recent_messages = get_recent_messages(selected_channel_id)
+    else:
+        print(f"\n{'='*20} CUSTOM MESSAGE HANDLING SKIPPED {'='*20}")
+        print(f"Reason: Custom conditions not met")
+        print(f"{'='*50}")
 
     # ---- EXISTING MESSAGE HANDLING ----
     if (
@@ -396,12 +618,40 @@ def channel_translate():
         selected_message_text = ""
         chat_title = ""
         chat_username = ""
-        for msg in recent_messages:
+        
+        print(f"\n{'='*20} MESSAGE LOOKUP DEBUG {'='*20}")
+        print(f"Looking for message ID: {selected_message_id}")
+        print(f"Recent messages count: {len(recent_messages)}")
+        
+        for i, msg in enumerate(recent_messages):
+            print(f"Message {i}:")
+            print(f"  id: {msg.get('id')}")
+            print(f"  html length: {len(msg.get('html', ''))}")
+            print(f"  html preview: {msg.get('html', '')[:100]}...")
+            print(f"  timestamp: {msg.get('timestamp')}")
+            print(f"  Match: {str(msg.get('id')) == str(selected_message_id)}")
+            
             if str(msg.get("id")) == str(selected_message_id):
                 selected_message_text = msg.get("html", "")
                 chat_title = msg.get("chat_title", "")
                 chat_username = msg.get("chat_username", "")
+                print(f"  FOUND MATCH!")
+                print(f"  Selected text length: {len(selected_message_text)}")
+                print(f"  Chat title: {chat_title}")
+                print(f"  Chat username: {chat_username}")
                 break
+        
+        print(f"Final selected_message_text length: {len(selected_message_text)}")
+        
+        # If we found the message ID but no content, this shouldn't happen with the improved lookup
+        if not selected_message_text and selected_message_id:
+            print(f"\n{'='*20} NO CONTENT FOUND {'='*20}")
+            print(f"Warning: No content found for message {selected_message_id}")
+            print(f"This indicates a data issue - the message exists but has no source content")
+            print(f"Channel ID: {selected_channel_id}")
+            print(f"{'='*50}")
+        
+        print(f"{'='*50}")
 
         edited_source = (
             request.form.get("edited_source") if request.method == "POST" else None
@@ -414,6 +664,14 @@ def channel_translate():
             and not selected_channel_is_en
             and action in ["translate", "save-translate"]
         ):
+            print(f"\n{'='*20} TRANSLATION ATTEMPT {'='*20}")
+            print(f"Selected message text length: {len(selected_message_text)}")
+            print(f"Selected message preview: {selected_message_text[:200]}...")
+            print(f"Channel is English: {selected_channel_is_en}")
+            print(f"Action: {action}")
+            print(f"Chat title: {chat_title}")
+            print(f"Chat username: {chat_username}")
+            
             try:
                 from translator.bot import translate_html
 
@@ -426,6 +684,7 @@ def channel_translate():
                     html_with_source = (
                         f"{selected_message_text}\n\nSource channel: {chat_title}"
                     )
+                
                 payload = {
                     "Channel": chat_title,
                     "Text": selected_message_text,
@@ -433,28 +692,67 @@ def channel_translate():
                     "Link": f"https://t.me/{chat_title}/{selected_message_id}",
                     "Meta": {},
                 }
-                anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+                
+                print(f"Payload created:")
+                print(f"  Channel: {payload['Channel']}")
+                print(f"  Text length: {len(payload['Text'])}")
+                print(f"  Html length: {len(payload['Html'])}")
+                print(f"  Link: {payload['Link']}")
+                
+                # Check API key
+                api_key = os.getenv("ANTHROPIC_API_KEY", "")
+                print(f"API key present: {bool(api_key)}")
+                print(f"API key length: {len(api_key) if api_key else 0}")
+                print(f"API key starts with: {api_key[:10]}..." if api_key else "NO KEY")
+                
+                anthropic_client = Anthropic(api_key=api_key)
+                print("Anthropic client created successfully")
+                
+                print("Calling translate_html...")
                 translation_result = asyncio.run(
                     translate_html(anthropic_client, payload)
                 )
+                print(f"Translation completed. Result length: {len(translation_result) if translation_result else 0}")
+                print(f"Translation preview: {translation_result[:200]}..." if translation_result else "EMPTY")
+                
                 import re
-
                 translation_result = re.sub(r"(</[a-z]+>)+$", "", translation_result)
-                raw_html_result = bleach.clean(
-                    translation_result,
-                    tags=["b", "i", "u", "a", "p", "br"],
-                    attributes={"a": ["href"]},
-                )
+                raw_html_result = clean_telegram_html(translation_result)
                 rendered_html_result = translation_result
+                
+                print(f"Final results:")
+                print(f"  translation_result length: {len(translation_result) if translation_result else 0}")
+                print(f"  raw_html_result length: {len(raw_html_result) if raw_html_result else 0}")
+                print(f"  rendered_html_result length: {len(rendered_html_result) if rendered_html_result else 0}")
+                print(f"{'='*50}")
+                
             except Exception as e:
+                print(f"TRANSLATION ERROR: {e}")
+                print(f"Error type: {type(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
                 translation_result = f"Error during translation: {e}"
-                raw_html_result = translation_result
+                raw_html_result = clean_telegram_html(translation_result)
                 rendered_html_result = translation_result
+                print(f"Set error results, translation_result: {translation_result}")
+        else:
+            print(f"\n{'='*20} TRANSLATION SKIPPED {'='*20}")
+            print(f"Selected message text present: {bool(selected_message_text)}")
+            print(f"Channel is English: {selected_channel_is_en}")
+            print(f"Action: {action}")
+            print(f"Action in translate/save-translate: {action in ['translate', 'save-translate']}")
+            print(f"{'='*50}")
 
         recent_messages = get_recent_messages(selected_channel_id)
 
     # Step 3: Post to target channel if requested
     if action == "post":
+        print(f"\n{'='*20} POST ACTION START {'='*20}")
+        print(f"selected_target_type: '{selected_target_type}'")
+        print(f"selected_target_channel_id: '{selected_target_channel_id}'")
+        print(f"form_translation_result available: {bool(form_translation_result)}")
+        print(f"form_raw_html_result available: {bool(form_raw_html_result)}")
+        print(f"{'='*50}")
+        
         try:
             from translator.services.telegram_sender import TelegramSender
 
@@ -462,8 +760,18 @@ def channel_translate():
             if not selected_target_type:
                 print(f"[ERROR] Post failed: Target channel not found")
                 post_result = {"success": False, "message": "Error posting: Target channel not found."}
-            else:                # Select the translated message to send
-                is_valid, message_to_send, error_message = select_message_to_send(translation_result, raw_html_result)
+            else:
+                print(f"\n{'='*20} POST ACTION DEBUG {'='*20}")
+                print(f"Form translation_result length: {len(form_translation_result) if form_translation_result else 0}")
+                print(f"Form raw_html_result length: {len(form_raw_html_result) if form_raw_html_result else 0}")
+                print(f"Form translation_result preview: {form_translation_result[:100]}..." if form_translation_result else "EMPTY")
+                print(f"Form raw_html_result preview: {form_raw_html_result[:100]}..." if form_raw_html_result else "EMPTY")
+                
+                # Select the translated message to send (handle None values)
+                is_valid, message_to_send, error_message = select_message_to_send(
+                    form_translation_result or "", 
+                    form_raw_html_result or ""
+                )
                 if not is_valid:
                     print(f"[ERROR] Message selection failed: {error_message}")
                     return jsonify({
@@ -511,12 +819,37 @@ def channel_translate():
                     else:
                         post_result = "No matching message to edit in target channel."
                 else:
+                    print(f"\n{'='*20} ATTEMPTING TO SEND MESSAGE {'='*20}")
+                    print(f"Target channel: {selected_target_channel_id}")
+                    print(f"Message length: {len(message_to_send)}")
+                    print(f"Message preview: {message_to_send[:200]}...")
+                    
+                    # Clear any previous recorder state for this send
+                    recorder.set(
+                        dest_channel_name=selected_target_type,
+                        dest_channel_id=selected_target_channel_id,
+                        api_error_code=None,
+                        exception_message=None,
+                        posting_success=False
+                    )
+                    
                     ok = asyncio.run(
                         sender.send_message(message_to_send, recorder)
                     )
-                    post_result = "Posted successfully." if ok else "Failed to post."
-                    # Log the event
+                    
+                    print(f"Send result: {ok}")
+                    
+                    # Get detailed error information from the recorder
+                    api_error = recorder.get("api_error_code")[0] if recorder.get("api_error_code") else None
+                    exception_msg = recorder.get("exception_message")[0] if recorder.get("exception_message") else None
+                    
+                    print(f"API error code: {api_error}")
+                    print(f"Exception message: {exception_msg}")
+                    print(f"{'='*50}")
+                    
                     if ok:
+                        post_result = "Posted successfully."
+                        # Log the event
                         target_obj = next(
                             (
                                 ch
@@ -540,8 +873,57 @@ def channel_translate():
                             source_message=message_to_send,
                             translated_message=message_to_send,
                         )
+                    else:
+                        # Create detailed error message
+                        error_details = f"Failed to post message"
+                        if exception_msg:
+                            error_details += f": {exception_msg}"
+                        if api_error:
+                            error_details += f" (API Error: {api_error})"
+                        
+                        post_result = {
+                            "success": False, 
+                            "message": error_details,
+                            "code": f"TELEGRAM_API_ERROR_{api_error}" if api_error else "TELEGRAM_SEND_FAILED",
+                            "suggestion": "Check bot permissions, channel ID, and message format"
+                        }
         except Exception as e:
-            post_result = f"Error posting: {e}"
+            print(f"\n{'='*20} POST EXCEPTION {'='*20}")
+            print(f"Exception type: {type(e)}")
+            print(f"Exception message: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            
+            # Get any recorder error information
+            api_error = recorder.get("api_error_code")[0] if recorder.get("api_error_code") else None
+            exception_msg = recorder.get("exception_message")[0] if recorder.get("exception_message") else None
+            
+            error_details = f"Exception during posting: {str(e)}"
+            if exception_msg and exception_msg != str(e):
+                error_details += f" | Telegram error: {exception_msg}"
+            if api_error:
+                error_details += f" | API Error: {api_error}"
+                
+            print(f"Detailed error: {error_details}")
+            print(f"{'='*50}")
+            
+            post_result = {
+                "success": False,
+                "message": error_details,
+                "code": f"TELEGRAM_API_ERROR_{api_error}" if api_error else "POST_EXCEPTION",
+                "suggestion": "Check bot configuration, API token, and channel permissions"
+            }
+
+    # Debug what we're returning to the template
+    print(f"\n{'='*20} RETURNING TO TEMPLATE {'='*20}")
+    print(f"translation_result: {translation_result[:200] if translation_result else 'EMPTY'}...")
+    print(f"raw_html_result: {raw_html_result[:200] if raw_html_result else 'EMPTY'}...")
+    print(f"rendered_html_result: {rendered_html_result[:200] if rendered_html_result else 'EMPTY'}...")
+    print(f"translation_result length: {len(translation_result) if translation_result else 0}")
+    print(f"raw_html_result length: {len(raw_html_result) if raw_html_result else 0}")
+    print(f"action: {action}")
+    print(f"selected_message_id: {selected_message_id}")
+    print(f"selected_channel_id: {selected_channel_id}")
+    print(f"{'='*50}")
 
     return render_template(
         "admin_manager.html",
@@ -604,7 +986,6 @@ def log_message_state(prefix: str, **kwargs):
             print(f"  Has HTML: {'<' in value and '>' in value}")
             # Log HTML tag information if present
             if '<' in value and '>' in value:
-                import re
                 tags = re.findall(r'</?([a-zA-Z0-9]+)[^>]*>', value)
                 print(f"  HTML tags: {list(set(tags))}")
         elif isinstance(value, (list, dict)):
@@ -866,6 +1247,12 @@ async def post_translation():
                 if ok:
                     post_result = {"success": True, "message": "Posted successfully."}
                 else:
+                    message_context = {
+                        "target_channel_id": selected_target_channel_id,
+                        "message_content": message_to_send,
+                        "source_channel_id": selected_channel_id,
+                        "message_id": selected_message_id
+                    }
                     error_info = await get_error_details(None, context=message_context)
                     log_message_state("SEND FAILED", error_info=error_info)
                     post_result = {

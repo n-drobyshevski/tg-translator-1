@@ -192,7 +192,7 @@ class TelegramSender:
                     dest_channel_id,
                     exception_message,
                 )
-                return 
+                return False
             result = r.json().get("result", {})
             sent_msg_id = result.get("message_id")
             posting_success = True
@@ -206,7 +206,7 @@ class TelegramSender:
             "Send message: Successfully sent %d chunk(s) to %s", len(chunks), target
         )
 
-        return
+        return True
 
     async def send_photo_message(
         self, photo: str, caption: str, recorder: EventRecorder
@@ -236,7 +236,7 @@ class TelegramSender:
                 dest_message_id=sent_msg_id,
                 posting_success=posting_success,
             )
-            return 
+            return False 
 
         result = r.json().get("result", {})
         sent_msg_id = result.get("message_id")
@@ -245,7 +245,7 @@ class TelegramSender:
         recorder.set(dest_message_id=sent_msg_id)
         recorder.set(posting_success=posting_success)
         logging.info("Successfully sent photo to %s", target)
-        return
+        return True
 
     async def edit_message(self, channel_id, message_id, text, recorder: EventRecorder):
         """
@@ -286,4 +286,4 @@ class TelegramSender:
             api_error_code=api_error_code,
             exception_message=exception_message,
         )
-        return
+        return posting_success

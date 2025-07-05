@@ -132,6 +132,15 @@
                        class="w-full min-h-[200px] p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                        onkeyup="updatePreview()" onpaste="handlePaste(event)">{{ custom_message_text|safe }}</div>
                 </div>
+                
+                <!-- Preview Area -->
+                <div class="flex-1">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Preview</label>
+                  <div id="preview" 
+                       class="w-full min-h-[200px] p-3 border rounded-lg bg-gray-50 text-sm text-gray-800">
+                    {{ custom_message_text|safe }}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -237,7 +246,7 @@
               </div>
               <div id="raw-html-source"
                 class="raw-html-view border border-blue-200 bg-gray-50 rounded-lg p-4 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                style="white-space: pre-line;">
+                style="white-space: pre-line; display: none;">
                 <pre class="m-0">{{ selected_message_text|e }}</pre>
               </div>
             </div>
@@ -264,7 +273,7 @@
               </div>
               <div id="raw-html-content"
                 class="raw-html-view border border-blue-200 bg-gray-50 rounded-lg p-4 mb-4 text-xs font-mono text-gray-700 overflow-x-auto"
-                style="white-space: pre-line;">
+                style="white-space: pre-line; display: none;">
                 <pre class="m-0">{{ raw_html_result|e }}</pre>
               </div>
             </div>
@@ -420,7 +429,26 @@
 
       // Initialize preview on page load
       document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, initializing preview...');
         updatePreviewContent();
+        
+        // Also initialize custom editor if visible
+        const customSection = document.getElementById('custom-message-section');
+        if (customSection && !customSection.classList.contains('hidden')) {
+          console.log('Custom section is visible, updating preview...');
+          updatePreview();
+        }
+        
+        // Add event listener to editor for content changes
+        const editor = document.getElementById('editor');
+        if (editor) {
+          // Initialize with existing content
+          updatePreview();
+          
+          // Listen for input events
+          editor.addEventListener('input', updatePreview);
+          console.log('Editor event listeners added');
+        }
       });      function toggleSourceEditMode() {
         const editArea = document.getElementById('source-edit-area');
         const messageBlock = document.getElementById('source-message-block');
@@ -573,18 +601,39 @@
         }
       }
 
-      // Ensure toggle raw HTML button works correctly
+      // Ensure toggle raw HTML button works correctly for both source and translation
       document.addEventListener('DOMContentLoaded', () => {
-        const toggleRawBtn = document.getElementById('toggleRawBtn');
+        const toggleRawBtn = document.getElementById('toggleRawHtmlBtn');
         const rawHtmlContent = document.getElementById('raw-html-content');
         const translatedMessageBlock = document.getElementById('translated-message-block');
+        const rawHtmlSource = document.getElementById('raw-html-source');
+        const sourceMessageBlock = document.getElementById('source-message-block');
         
-        if (toggleRawBtn && rawHtmlContent && translatedMessageBlock) {
+        if (toggleRawBtn && rawHtmlContent && translatedMessageBlock && rawHtmlSource && sourceMessageBlock) {
+          // Set initial state - raw HTML is hidden, preview is shown for both source and translation
+          rawHtmlContent.style.display = 'none';
+          translatedMessageBlock.style.display = 'block';
+          rawHtmlSource.style.display = 'none';
+          sourceMessageBlock.style.display = 'block';
+          
           toggleRawBtn.addEventListener('click', () => {
-            rawHtmlContent.style.display = rawHtmlContent.style.display === 'none' ? 'block' : 'none';
-            translatedMessageBlock.style.display = translatedMessageBlock.style.display === 'none' ? 'block' : 'none';
+            const isRawVisible = rawHtmlContent.style.display !== 'none';
             
-            // Update button text
+            if (isRawVisible) {
+              // Switch to preview mode for both source and translation
+              rawHtmlContent.style.display = 'none';
+              translatedMessageBlock.style.display = 'block';
+              rawHtmlSource.style.display = 'none';
+              sourceMessageBlock.style.display = 'block';
+            } else {
+              // Switch to raw HTML mode for both source and translation
+              rawHtmlContent.style.display = 'block';
+              translatedMessageBlock.style.display = 'none';
+              rawHtmlSource.style.display = 'block';
+              sourceMessageBlock.style.display = 'none';
+            }
+            
+            // Update button text and icon
             const icon = toggleRawBtn.querySelector('i');
             const text = toggleRawBtn.querySelector('span');
             if (rawHtmlContent.style.display === 'none') {
@@ -727,53 +776,6 @@
           if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       });
-      document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('toggleRawBtn');
-        if (!btn) return;
-        
-        // Initial state
-        let showingRaw = false;
-        
-        function updateToggleState() {
-          const iconEl = btn.querySelector('i');
-          const textEl = btn.querySelector('span');
-          
-          if (showingRaw) {
-            btn.classList.add('bg-blue-50');
-            iconEl.classList.remove('fa-code');
-            iconEl.classList.add('fa-eye');
-            textEl.textContent = 'Show Rendered';
-          } else {
-            btn.classList.remove('bg-blue-50');
-            iconEl.classList.remove('fa-eye');
-            iconEl.classList.add('fa-code');
-            textEl.textContent = 'Show Raw HTML';
-          }
-        }
-        
-        btn.addEventListener('click', () => {
-          const srcRaw = document.getElementById('raw-html-source');
-          const srcBlock = document.getElementById('source-message-block');
-          const tgtRaw = document.getElementById('raw-html-content');
-          const tgtBlock = document.getElementById('translated-message-block');
-          
-          if (!(srcRaw && srcBlock && tgtRaw && tgtBlock)) return;
-          
-          showingRaw = !showingRaw;
-          
-          // Update visibility
-          srcRaw.style.display = showingRaw ? 'block' : 'none';
-          srcBlock.style.display = showingRaw ? 'none' : 'block';
-          tgtRaw.style.display = showingRaw ? 'block' : 'none';
-          tgtBlock.style.display = showingRaw ? 'none' : 'block';
-          
-          // Update button state
-          updateToggleState();
-        });
-        
-        // Set initial state
-        updateToggleState();
-      });
       // Custom message editor functions
       function formatText(command) {
         document.execCommand(command, false, null);
@@ -795,14 +797,33 @@
         const preview = document.getElementById('preview');
         const hiddenInput = document.getElementById('hidden_message_text');
         
+        if (!editor) {
+          console.log('updatePreview: No editor found');
+          return;
+        }
+        
         // Get the HTML content
         const content = editor.innerHTML;
         
-        // Update preview
-        preview.innerHTML = content;
+        // Debug logging
+        console.log('updatePreview called:');
+        console.log('  Editor content length:', content.length);
+        console.log('  Editor content:', content.substring(0, 100) + '...');
         
-        // Update hidden input
-        hiddenInput.value = content;
+        // Update preview if it exists
+        if (preview) {
+          preview.innerHTML = content;
+        } else {
+          console.log('updatePreview: No preview element found');
+        }
+        
+        // Update hidden input if it exists
+        if (hiddenInput) {
+          hiddenInput.value = content;
+          console.log('  Hidden input updated with length:', content.length);
+        } else {
+          console.log('updatePreview: No hidden input found');
+        }
       }
       function handlePaste(event) {
         event.preventDefault();
@@ -811,9 +832,47 @@
         updatePreview();
       }
       function submitForm() {
+        // Update the hidden input with editor content before submitting
+        updatePreview();
+        
         const form = document.getElementById('custom-message-form');
-        if (form) {
+        const editor = document.getElementById('editor');
+        const hiddenInput = document.getElementById('hidden_message_text');
+        
+        // Debug logging
+        console.log('=== CUSTOM FORM SUBMISSION DEBUG ===');
+        console.log('Editor content:', editor ? editor.innerHTML : 'NO EDITOR');
+        console.log('Hidden input value:', hiddenInput ? hiddenInput.value : 'NO HIDDEN INPUT');
+        console.log('Form elements:', form ? Array.from(form.elements).map(e => `${e.name}=${e.value}`).join(', ') : 'NO FORM');
+        
+        if (form && editor && hiddenInput) {
+          // Ensure the hidden input has the editor content
+          const editorContent = editor.innerHTML.trim();
+          hiddenInput.value = editorContent;
+          
+          console.log('Final hidden input value:', hiddenInput.value);
+          
+          // Validate content before submitting
+          if (!editorContent) {
+            alert('Please enter some content in the editor before translating.');
+            console.log('Submission cancelled: empty content');
+            return;
+          }
+          
+          // Add the action field for custom translation
+          const actionInput = document.createElement('input');
+          actionInput.type = 'hidden';
+          actionInput.name = 'action';
+          actionInput.value = 'translate_custom';
+          form.appendChild(actionInput);
+          
+          console.log('Submitting form...');
           form.submit();
+        } else {
+          console.log('Form submission failed: missing elements');
+          console.log('Form:', !!form);
+          console.log('Editor:', !!editor);
+          console.log('Hidden input:', !!hiddenInput);
         }
       }
       // Enhanced HTML toggle for source message that respects edit mode

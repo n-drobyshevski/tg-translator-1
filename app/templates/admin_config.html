@@ -7,6 +7,7 @@
   rel="stylesheet"
   href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 />
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin_config.css') }}" />
 {% endblock %}
 {% block header %}
 <div class="flex items-center w-full">
@@ -18,27 +19,37 @@
   </h1>
     <!-- Test Channel Checkbox -->
     <div class="flex items-center gap-2 ml-4">
-      <form method="POST">
-        <button type="submit" name="action" value="load"
-          class="flex items-center gap-2 px-4 py-2 bg-transparent border border-gray-500 text-gray-500 rounded-lg hover:bg-gray-500 hover:text-white transition w-full sm:w-auto"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-          </svg>
-          Load Existing
-        </button>
-      </form>
-      <form method="POST">
-        <input type="hidden" name="action" value="restart" />
-        <button type="submit"
-          class="flex items-center gap-2 px-4 py-2 bg-transparent border border-blue-400 text-blue-500 rounded-lg hover:bg-blue-400 hover:text-white transition w-full sm:w-auto"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Restart Task
-        </button>
-      </form>
+      <div class="admin-btn-group">
+        <form method="POST" class="flex-grow">
+          <button type="submit" name="action" value="load"
+            class="admin-btn admin-btn-primary"
+            aria-label="Load existing configuration"
+            x-data="{ loading: false }"
+            :aria-busy="loading"
+            @click="loading = true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Load Existing
+          </button>
+        </form>
+        <form method="POST" class="flex-grow">
+          <input type="hidden" name="action" value="restart" />
+          <button type="submit"
+            class="admin-btn admin-btn-warning"
+            aria-label="Restart task service"
+            x-data="{ loading: false }"
+            :aria-busy="loading"
+            @click="loading = true"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Restart Task
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </div>
